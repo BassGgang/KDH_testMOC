@@ -29,18 +29,24 @@ export default function HomePage() {
           </ul>
         </section>
 
-        <nav className="grid grid-cols-2 gap-3">
+        <nav className="grid grid-cols-3 gap-3">
           <Link
             href="/scoring"
-            className="block p-4 bg-navy-950 text-white font-black uppercase tracking-widest text-sm hover:bg-navy-900 transition-colors text-center"
+            className="block p-4 bg-navy-950 text-white font-black uppercase tracking-widest text-xs hover:bg-navy-900 transition-colors text-center"
           >
-            Scoring App →
+            Scoring →
+          </Link>
+          <Link
+            href="/tournaments"
+            className="block p-4 bg-navy-950 text-white font-black uppercase tracking-widest text-xs hover:bg-navy-900 transition-colors text-center"
+          >
+            Tournaments →
           </Link>
           <Link
             href="/viewer"
-            className="block p-4 border-2 border-navy-950 text-navy-950 font-black uppercase tracking-widest text-sm hover:bg-navy-950 hover:text-white transition-colors text-center"
+            className="block p-4 border-2 border-navy-950 text-navy-950 font-black uppercase tracking-widest text-xs hover:bg-navy-950 hover:text-white transition-colors text-center"
           >
-            Viewer App →
+            Viewer →
           </Link>
         </nav>
       </div>

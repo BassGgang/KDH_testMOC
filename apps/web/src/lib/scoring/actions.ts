@@ -47,6 +47,58 @@ export interface CreateMatchInput {
   tatamiNo?: number | null;
 }
 
+export interface ImportFromBracketInput {
+  matchId: string;
+  tournamentId: string;
+  categoryId: string | null;
+  akaName: string;
+  aoName: string;
+  akaAthleteId: string;
+  aoAthleteId: string;
+  round: number;
+  settings?: MatchSettings;
+}
+
+/**
+ * Import a match that was just started from a bracket on the server.
+ * Creates a local match record with the server-assigned matchId so that the
+ * scoring screen can find it and subsequent sync writes line up.
+ *
+ * matchDraftSent is set to 1 because the server already has the matches row.
+ */
+export async function importMatchFromBracket(input: ImportFromBracketInput): Promise<void> {
+  const db = getDB();
+  const existing = await db.matches.get(input.matchId);
+  if (existing) return;
+
+  const settings: MatchSettings = input.settings ?? {
+    durationSec: 180,
+    targetScore: 8,
+    pointGap: 8,
+    senshuEnabled: true,
+  };
+
+  const match: LocalMatch = {
+    id: input.matchId,
+    status: 'in_progress',
+    type: 'Kumite',
+    akaName: input.akaName,
+    aoName: input.aoName,
+    akaAthleteId: input.akaAthleteId,
+    aoAthleteId: input.aoAthleteId,
+    tournamentId: input.tournamentId,
+    categoryId: input.categoryId,
+    round: input.round,
+    tatamiNo: null,
+    settings,
+    startedAt: null,
+    endedAt: null,
+    createdAt: nowIso(),
+    matchDraftSent: 1,
+  };
+  await db.matches.add(match);
+}
+
 export async function createMatch(input: CreateMatchInput): Promise<string> {
   const db = getDB();
   const id = uuid();

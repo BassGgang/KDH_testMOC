@@ -1,0 +1,38 @@
+{
+  "name": "Karate Scoring & Analytics",
+  "short_name": "Karate",
+  "description": "空手の試合得点管理と選手データ分析",
+  "lang": "ja",
+  "start_url": "/scoring",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFFFFF",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Match",
+      "short_name": "New",
+      "url": "/scoring/new"
+    },
+    {
+      "name": "Athletes",
+      "short_name": "Athletes",
+      "url": "/viewer"
+    }
+  ]
+}
