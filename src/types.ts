@@ -1,8 +1,9 @@
-export type Rank = 'White' | 'Yellow' | 'Orange' | 'Green' | 'Blue' | 'Brown' | 'Black' | '1st Dan' | '2nd Dan' | '3rd Dan';
+export type Rank = string;
 
 export interface Athlete {
   id: string;
   name: string;
+  kana?: string;
   rank: Rank;
   affiliation: string;
   stats: {
@@ -25,8 +26,7 @@ export interface ScoreDetail {
   ippon: number; // 3 points
   wazaAri: number; // 2 points
   yuko: number; // 1 point
-  c1: number; // Category 1 penalties
-  c2: number; // Category 2 penalties
+  c: number; // Category penalties (merged C1 & C2 to just C)
 }
 
 export interface MatchSettings {
