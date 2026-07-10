@@ -147,7 +147,7 @@ karate-system/
 | ローカル DB | Dexie (IndexedDB) |
 | バックエンド | Next.js Route Handlers (Node.js runtime) |
 | データベース | Supabase Postgres (Tokyo) |
-| 認証 | Supabase Auth (まだ未統合) |
+| 認証 | Supabase Auth (email OTP, @supabase/ssr) |
 | バリデーション | Zod |
 | UI コンポーネント | lucide-react, recharts |
 | ホスティング (想定) | Vercel + Supabase Free Tier |
@@ -193,23 +193,46 @@ IndexedDB トランザクション (1回で2つ書く)
 
 ---
 
+## 採点ルール (NexTep モデル)
+
+採点ロジックは `test_moc` のデザインモックの仕様を正としています(WKF 標準から一部意図的に逸脱)。
+実装は `packages/domain`、モックの手本は [test_moc/src/components/ScoringInterface.tsx](test_moc/src/components/ScoringInterface.tsx)。
+
+- 得点: 一本 +3 / 技あり +2 / 有効 +1
+- 反則 C: 統合カウント。5 回で失格。**10 カウント**は即失格 (c += 5)
+- **ラスト 15 秒の反則**: 相手に加点 (当てすぎ +1 / それ以外 +4)
+- 先取 (SENSHU): 審判の**手動トグル**
+- 勝敗判定順: 失格 → 合計点 → 先取 → 一本数 → 技あり数 → HANTEI(判定投票)
+- Admin パネルでのイベント削除に応じた**逆再計算**(終了条件が解けたら試合再開)
+
+---
+
+## 解消済み (この実装で対応)
+
+| 項目 | 対応内容 |
+|---|---|
+| 認証・認可 | Supabase Auth (email OTP) + JWT 検証 (`getUser`) + role ベース認可 + middleware 保護。書き込み系 API は operator 限定 (アプリ層 + RPC 内の二重ガード) |
+| RLS 有効化 | 全ポリシーを `app_current_role()` で稼働。読み取りは anon+RLS、書き込みは限定パス |
+| 原子性 | `finish_match` / `create_tournament` を plpgsql RPC 化しトランザクション保証 |
+| 勝者の自動進出 | match finish → `advance_winner` で次スロットへ自動反映。BYE は多段自動進出 |
+| stats キャッシュ | finish 時に `refresh_athlete_stats` で `athlete_stats_cache` を更新 |
+| profiles 自動生成 | `handle_new_user` トリガ(全 signup を least-privilege の athlete で作成) |
+
 ## 既知の制約 (MVP)
 
-本番運用前に解消すべき項目。詳細は [ARCHITECTURE.md §16](ARCHITECTURE.md#16-今後の検討事項) を参照。
+本番運用前に解消すべき項目。
 
 | 項目 | 現状 | 必要な対応 |
 |---|---|---|
-| 認証 | API は service_role で全アクセス可 | Supabase Auth + JWT 検証 + RLS 連携 |
-| 勝者の自動進出 | 手動 (試合完了後にブラケット手動更新) | match finish → 次 round slot に winner を自動反映 |
 | Atoshibaraku | 未実装 | 残り 15 秒で senshu 失効ロジック追加 |
 | 延長戦 (Encho-sen) | 未実装 | 同点 hantei 後の延長戦サポート |
 | 形 (Kata) 採点 | 未対応 | 別 UI + 別ルール (5-7 審判の点数、最高最低カット) |
 | ダブルエリミ / リーグ戦 | 未実装 | bracket format ごとに UI とロジック追加 |
-| stats 計算式 | 暫定式 (UI に「PROVISIONAL」表示) | 空手有識者と協議して確定 |
+| stats 計算式 | 暫定式 (speed/stamina はプレースホルダ) | 空手有識者と協議して確定 |
 | PDF / CSV エクスポート | 未実装 | 結果配布機能 |
 | 多言語対応 | 日本語のみ | i18n ライブラリ導入 |
 | Athletes マスタ管理 UI | Supabase Dashboard 経由のみ | 運営画面で CRUD |
-| プッシュ通知 | 未実装 | 試合開始通知など |
+| API 統合テスト / E2E | 未導入 | Route Handler 統合テスト・Playwright |
 | 監査ログ | 未実装 | 誰がいつ何を編集したか |
 
 ---
@@ -221,11 +244,12 @@ make test
 ```
 
 ```
-✓ packages/domain  54 tests  (scoring rules, penalty, stats, bracket)
-✓ packages/schemas 18 tests  (Zod schema validation)
+✓ packages/domain   59 tests  (scoring rules, penalty, stats, bracket)
+✓ packages/schemas  19 tests  (Zod schema validation)
 ```
 
-E2E テスト (Playwright) は未導入。
+ドメイン層(採点の数理)とスキーマ契約は単体テストで担保。API Route Handler の統合テストと
+E2E (Playwright) は未導入。SQL RPC・ブラケット進出・認可ガードはローカル Postgres で手動検証済み。
 
 ---
 
