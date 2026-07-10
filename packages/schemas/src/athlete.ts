@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UuidSchema } from './common';
+import { IsoDateTimeSchema, UuidSchema } from './common';
 
 export const AthleteStatsSchema = z.object({
   attack: z.number().min(0).max(100),
@@ -25,20 +25,22 @@ export const AthleteResponseSchema = z.object({
 
 export type AthleteResponse = z.infer<typeof AthleteResponseSchema>;
 
+// Matches the shape returned by GET /api/athletes/:id.
 export const MatchHistoryItemSchema = z.object({
   matchId: UuidSchema,
-  tournamentName: z.string(),
-  date: z.string().date(),
-  result: z.enum(['Win', 'Loss']),
+  date: IsoDateTimeSchema.nullable(),
+  round: z.number().int().positive(),
+  isWin: z.boolean(),
+  ownScore: z.number().int().nonnegative(),
+  opponentScore: z.number().int().nonnegative(),
   opponentName: z.string(),
-  score: z.string(),                 // e.g., "5-3"
 });
 
 export type MatchHistoryItem = z.infer<typeof MatchHistoryItemSchema>;
 
-export const AthleteHistoryResponseSchema = z.object({
-  athleteId: UuidSchema,
+// Full response of GET /api/athletes/:id: profile + stats + history.
+export const AthleteDetailResponseSchema = AthleteResponseSchema.extend({
   history: z.array(MatchHistoryItemSchema),
 });
 
-export type AthleteHistoryResponse = z.infer<typeof AthleteHistoryResponseSchema>;
+export type AthleteDetailResponse = z.infer<typeof AthleteDetailResponseSchema>;

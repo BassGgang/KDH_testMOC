@@ -1,6 +1,6 @@
 'use client';
 
-import type { MatchSettings, ScoringEventKind, Side } from '@karate/domain';
+import type { MatchSettings, PenaltyReason, ScoringEventKind, Side } from '@karate/domain';
 import {
   getDB, type LocalMatch, type LocalScoringEvent, type OutboxEntry,
 } from '../db/dexie';
@@ -93,6 +93,7 @@ export async function importMatchFromBracket(input: ImportFromBracketInput): Pro
     settings,
     startedAt: null,
     endedAt: null,
+    senshuHolder: null,
     createdAt: nowIso(),
     matchDraftSent: 1,
   };
@@ -117,6 +118,7 @@ export async function createMatch(input: CreateMatchInput): Promise<string> {
     settings: input.settings,
     startedAt: null,
     endedAt: null,
+    senshuHolder: null,
     createdAt: nowIso(),
     matchDraftSent: 0,
   };
@@ -135,7 +137,13 @@ export async function addEvent(
   matchId: string,
   side: Side,
   kind: ScoringEventKind,
-  options: { technique?: string; occurredAtMs: number } = { occurredAtMs: 0 },
+  options: {
+    target?: 'jodan' | 'chudan';
+    technique?: 'tsuki' | 'keri';
+    penaltyReason?: PenaltyReason;
+    occurredAtMs: number;
+    remainingMs: number;
+  },
 ): Promise<void> {
   const db = getDB();
   const event: LocalScoringEvent = {
@@ -143,8 +151,11 @@ export async function addEvent(
     matchId,
     side,
     kind,
+    target: options.target ?? null,
     technique: options.technique ?? null,
+    penaltyReason: options.penaltyReason ?? null,
     occurredAtMs: options.occurredAtMs,
+    remainingMs: options.remainingMs,
     createdAt: nowIso(),
   };
   // Atomic: insert event AND outbox entry in one transaction.
@@ -189,8 +200,27 @@ export async function resetMatch(matchId: string): Promise<void> {
       status: 'in_progress',
       startedAt: null,
       endedAt: null,
+      senshuHolder: null,
       matchDraftSent: 0,
     });
+  });
+}
+
+/** Manually assign or clear the senshu holder (referee toggle). */
+export async function setSenshuHolder(matchId: string, side: Side | null): Promise<void> {
+  const db = getDB();
+  await db.matches.update(matchId, { senshuHolder: side });
+}
+
+/**
+ * Delete a single event by id (admin correction). Removes any pending outbox
+ * entry too; already-synced events can't be recalled here (server is SSOT).
+ */
+export async function deleteEvent(matchId: string, eventId: string): Promise<void> {
+  const db = getDB();
+  await db.transaction('rw', db.events, db.outbox, async () => {
+    await db.events.delete(eventId);
+    await db.outbox.where({ kind: 'event', eventId }).delete();
   });
 }
 

@@ -5,7 +5,7 @@ import {
 import type { ScoringEvent } from '../src/types';
 
 function ev(partial: Partial<ScoringEvent> & Pick<ScoringEvent, 'side' | 'kind'>): ScoringEvent {
-  return { id: 'e', matchId: 'm', occurredAtMs: 0, ...partial };
+  return { id: 'e', matchId: 'm', occurredAtMs: 0, remainingMs: 120_000, ...partial };
 }
 
 describe('summarizeMatch', () => {

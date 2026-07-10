@@ -1,35 +1,40 @@
 import type { ScoreDetail } from '../types';
+import { DISQUALIFY_C } from './score';
 
+/**
+ * NexTep uses a single unified category-penalty track shown as five dots.
+ * The fifth penalty (c >= 5) is a disqualification; a 10-count reaches it in
+ * one event (c += 5, see score.ts).
+ */
 export type PenaltyStatus =
   | 'none'
-  | 'chukoku'        // 1st: warning, no points
-  | 'keikoku'        // 2nd: warning, no points
-  | 'hansoku_chui'   // 3rd: final warning
-  | 'hansoku';       // 4th: disqualification
+  | 'c1'
+  | 'c2'
+  | 'c3'
+  | 'c4'
+  | 'hansoku'; // c >= 5: disqualified
 
-// Modern WKF (post-2020): each category (C1 and C2) accumulates independently
-// in the progression chukoku -> keikoku -> hansoku_chui -> hansoku.
-// Hansoku triggers an immediate loss.
 function statusForCount(count: number): PenaltyStatus {
   if (count <= 0) return 'none';
-  if (count === 1) return 'chukoku';
-  if (count === 2) return 'keikoku';
-  if (count === 3) return 'hansoku_chui';
+  if (count === 1) return 'c1';
+  if (count === 2) return 'c2';
+  if (count === 3) return 'c3';
+  if (count === 4) return 'c4';
   return 'hansoku';
 }
 
 export interface PenaltyState {
-  c1Status: PenaltyStatus;
-  c2Status: PenaltyStatus;
+  status: PenaltyStatus;
+  /** Number of lit dots (capped at 5) for the UI. */
+  count: number;
   isHansoku: boolean;
 }
 
 export function evaluatePenalty(detail: ScoreDetail): PenaltyState {
-  const c1Status = statusForCount(detail.c1);
-  const c2Status = statusForCount(detail.c2);
+  const status = statusForCount(detail.c);
   return {
-    c1Status,
-    c2Status,
-    isHansoku: c1Status === 'hansoku' || c2Status === 'hansoku',
+    status,
+    count: Math.min(detail.c, DISQUALIFY_C),
+    isHansoku: detail.c >= DISQUALIFY_C,
   };
 }

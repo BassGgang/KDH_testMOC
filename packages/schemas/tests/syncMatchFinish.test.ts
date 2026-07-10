@@ -68,6 +68,7 @@ describe('SyncMatchFinishRequestSchema', () => {
           side: 'AKA',
           kind: 'yuko',
           occurredAtMs: 1000,
+          remainingMs: 179_000,
         },
       ],
     });

@@ -25,8 +25,11 @@ export async function POST(req: NextRequest) {
     matchId: e.matchId,
     side: e.side,
     kind: e.kind,
+    target: e.target,
     technique: e.technique,
+    penaltyReason: e.penaltyReason,
     occurredAtMs: e.occurredAtMs,
+    remainingMs: e.remainingMs,
   }));
   const elapsedMs =
     Date.parse(payload.endedAt) - Date.parse(payload.startedAt);
@@ -34,6 +37,7 @@ export async function POST(req: NextRequest) {
     events: domainEvents,
     settings: payload.settings,
     elapsedMs: Math.max(elapsedMs, payload.settings.durationSec * 1000),
+    senshuHolder: payload.result.senshuHolder,
   });
 
   // We accept hantei_required matches as long as the client supplied a winner
@@ -110,8 +114,11 @@ export async function POST(req: NextRequest) {
       match_id: e.matchId,
       side: e.side,
       kind: e.kind,
+      target: e.target ?? null,
       technique: e.technique ?? null,
+      penalty_reason: e.penaltyReason ?? null,
       occurred_at_ms: e.occurredAtMs,
+      remaining_ms: e.remainingMs,
     }));
     const { error: insertEventsErr } = await supabase
       .from('scoring_events')

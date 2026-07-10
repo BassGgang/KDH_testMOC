@@ -9,11 +9,11 @@ import {
 } from 'lucide-react';
 import {
   aggregateScores, evaluateMatch, evaluatePenalty, totalPoints,
-  type ScoringEvent, type ScoringEventKind, type Side,
+  type PenaltyReason, type ScoringEvent, type ScoringEventKind, type Side,
 } from '@karate/domain';
 import { getDB } from '@/lib/db/dexie';
 import {
-  addEvent, finishMatch, resetMatch, startMatchTimer, undoLastEvent,
+  addEvent, finishMatch, resetMatch, setSenshuHolder, startMatchTimer, undoLastEvent,
 } from '@/lib/scoring/actions';
 import { cn, formatTime } from '@/lib/utils';
 import { SyncStatus } from '@/components/SyncStatus';
@@ -46,8 +46,11 @@ export default function MatchScoringPage({ params }: { params: Promise<{ matchId
       matchId: e.matchId,
       side: e.side,
       kind: e.kind,
+      target: e.target ?? undefined,
       technique: e.technique ?? undefined,
+      penaltyReason: e.penaltyReason ?? undefined,
       occurredAtMs: e.occurredAtMs,
+      remainingMs: e.remainingMs,
     })),
     [events],
   );
@@ -58,6 +61,7 @@ export default function MatchScoringPage({ params }: { params: Promise<{ matchId
       events: domainEvents,
       settings: match.settings,
       elapsedMs: elapsedSec * 1000,
+      senshuHolder: match.senshuHolder,
     });
   }, [match, domainEvents, elapsedSec]);
 
@@ -72,10 +76,33 @@ export default function MatchScoringPage({ params }: { params: Promise<{ matchId
   const akaPenalty = evaluatePenalty(scores.AKA);
   const aoPenalty = evaluatePenalty(scores.AO);
 
-  async function handleAddEvent(side: Side, kind: ScoringEventKind) {
+  function remainingMs(): number {
+    if (!match) return 0;
+    return Math.max(0, (match.settings.durationSec - elapsedSec) * 1000);
+  }
+
+  async function handleAddPoint(side: Side, kind: 'ippon' | 'waza_ari' | 'yuko') {
     if (!match) return;
     if (!match.startedAt) await startMatchTimer(matchId);
-    await addEvent(matchId, side, kind, { occurredAtMs: elapsedSec * 1000 });
+    await addEvent(matchId, side, kind, {
+      occurredAtMs: elapsedSec * 1000,
+      remainingMs: remainingMs(),
+    });
+  }
+
+  async function handleAddPenalty(side: Side, reason: PenaltyReason) {
+    if (!match) return;
+    if (!match.startedAt) await startMatchTimer(matchId);
+    await addEvent(matchId, side, 'c', {
+      penaltyReason: reason,
+      occurredAtMs: elapsedSec * 1000,
+      remainingMs: remainingMs(),
+    });
+  }
+
+  async function handleToggleSenshu(side: Side) {
+    if (!match) return;
+    await setSenshuHolder(matchId, match.senshuHolder === side ? null : side);
   }
 
   async function handleStartStop() {
@@ -162,26 +189,26 @@ export default function MatchScoringPage({ params }: { params: Promise<{ matchId
           athleteName={match.akaName}
           score={totalPoints(scores.AKA)}
           penaltyState={akaPenalty}
-          c1Count={scores.AKA.c1}
-          c2Count={scores.AKA.c2}
-          senshu={outcome?.status !== 'in_progress' ? null : (
-            evaluateMatch({ events: domainEvents, settings: match.settings, elapsedMs: 0 }).status
-          ) ? null : null}
+          hasSenshu={match.senshuHolder === 'AKA'}
+          senshuEnabled={match.settings.senshuEnabled}
           isWinner={outcome?.status === 'decided' && outcome.winnerId === 'AKA'}
           disabled={decided}
-          onPoint={(k) => handleAddEvent('AKA', k)}
+          onPoint={(k) => handleAddPoint('AKA', k)}
+          onPenalty={(r) => handleAddPenalty('AKA', r)}
+          onToggleSenshu={() => handleToggleSenshu('AKA')}
         />
         <ScoringPanel
           side="AO"
           athleteName={match.aoName}
           score={totalPoints(scores.AO)}
           penaltyState={aoPenalty}
-          c1Count={scores.AO.c1}
-          c2Count={scores.AO.c2}
-          senshu={null}
+          hasSenshu={match.senshuHolder === 'AO'}
+          senshuEnabled={match.settings.senshuEnabled}
           isWinner={outcome?.status === 'decided' && outcome.winnerId === 'AO'}
           disabled={decided}
-          onPoint={(k) => handleAddEvent('AO', k)}
+          onPoint={(k) => handleAddPoint('AO', k)}
+          onPenalty={(r) => handleAddPenalty('AO', r)}
+          onToggleSenshu={() => handleToggleSenshu('AO')}
         />
       </div>
 
@@ -204,20 +231,33 @@ export default function MatchScoringPage({ params }: { params: Promise<{ matchId
 
 // ---------- Subcomponents ----------
 
+const PENALTY_REASONS: { value: PenaltyReason; label: string }[] = [
+  { value: 'atesugi', label: '当てすぎ' },
+  { value: 'jogai', label: '場外' },
+  { value: 'time_wasting', label: '時間の空費' },
+  { value: 'mubobi', label: '無防備' },
+  { value: 'grabbing', label: '相手のつかみすぎ' },
+  { value: 'other', label: 'その他' },
+  { value: 'ten_count', label: '10カウント (即失格)' },
+];
+
 function ScoringPanel({
-  side, athleteName, score, c1Count, c2Count, penaltyState, isWinner, disabled, onPoint,
+  side, athleteName, score, penaltyState, hasSenshu, senshuEnabled,
+  isWinner, disabled, onPoint, onPenalty, onToggleSenshu,
 }: {
   side: Side;
   athleteName: string;
   score: number;
-  c1Count: number;
-  c2Count: number;
-  penaltyState: { c1Status: string; c2Status: string; isHansoku: boolean };
-  senshu: null;
+  penaltyState: { count: number; isHansoku: boolean };
+  hasSenshu: boolean;
+  senshuEnabled: boolean;
   isWinner: boolean;
   disabled: boolean;
-  onPoint: (kind: ScoringEventKind) => void;
+  onPoint: (kind: 'ippon' | 'waza_ari' | 'yuko') => void;
+  onPenalty: (reason: PenaltyReason) => void;
+  onToggleSenshu: () => void;
 }) {
+  const [pickingReason, setPickingReason] = useState(false);
   const sideColor = side === 'AKA' ? 'bg-red-600' : 'bg-blue-600';
   const sideText = side === 'AKA' ? '赤' : '青';
 
@@ -230,34 +270,70 @@ function ScoringPanel({
         {sideText} / {side} — {athleteName}
       </div>
 
-      <div className="py-6 flex items-center justify-center">
+      <div className="py-6 flex items-center justify-center gap-4">
+        {hasSenshu && (
+          <span className="flex flex-col items-center gap-1 text-green-600">
+            <span className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]" />
+            <span className="text-[9px] font-black tracking-widest uppercase">先取</span>
+          </span>
+        )}
         <div className="text-[120px] font-mono font-black leading-none">{score}</div>
       </div>
 
       {/* Point buttons */}
       <div className="grid grid-cols-3 gap-2 px-4">
-        <PointButton label="有効" sub="YUKO +1"     disabled={disabled} onClick={() => onPoint('yuko')} />
-        <PointButton label="技あり" sub="WAZA +2"   disabled={disabled} onClick={() => onPoint('waza_ari')} />
+        <PointButton label="有効" sub="YUKO +1"    disabled={disabled} onClick={() => onPoint('yuko')} />
+        <PointButton label="技あり" sub="WAZA +2"  disabled={disabled} onClick={() => onPoint('waza_ari')} />
         <PointButton label="一本"   sub="IPPON +3" disabled={disabled} onClick={() => onPoint('ippon')} />
       </div>
 
-      {/* Penalty buttons */}
+      {/* Penalty + senshu */}
       <div className="grid grid-cols-2 gap-2 p-4">
-        <PenaltyButton label="C1" count={c1Count} status={penaltyState.c1Status} disabled={disabled} onClick={() => onPoint('c1')} />
-        <PenaltyButton label="C2" count={c2Count} status={penaltyState.c2Status} disabled={disabled} onClick={() => onPoint('c2')} />
-      </div>
-
-      {/* Termination buttons */}
-      <div className="grid grid-cols-3 gap-2 px-4 pb-4">
-        <TerminationButton label="Hansoku" disabled={disabled} onClick={() => onPoint('hansoku')} />
-        <TerminationButton label="Kiken"   disabled={disabled} onClick={() => onPoint('kiken')} />
-        <TerminationButton label="Shikkaku" disabled={disabled} onClick={() => onPoint('shikkaku')} />
+        <PenaltyButton
+          count={penaltyState.count}
+          isHansoku={penaltyState.isHansoku}
+          disabled={disabled}
+          onClick={() => setPickingReason(true)}
+        />
+        <SenshuButton
+          active={hasSenshu}
+          disabled={disabled || !senshuEnabled}
+          onClick={onToggleSenshu}
+        />
       </div>
 
       {isWinner && (
         <div className="absolute top-2 right-2 bg-yellow-400 text-navy-950 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5 shadow-lg">
           <Trophy size={12} fill="currentColor" />
           Winner
+        </div>
+      )}
+
+      {pickingReason && (
+        <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-sm z-10 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-xs flex flex-col gap-2 max-h-full overflow-y-auto">
+            <p className="text-xs font-black uppercase tracking-widest text-navy-950/50 mb-1">反則の内容 / {sideText}</p>
+            {PENALTY_REASONS.map((r) => (
+              <button
+                key={r.value}
+                onClick={() => { onPenalty(r.value); setPickingReason(false); }}
+                className={cn(
+                  'text-left px-3 py-2.5 rounded-xl border-2 font-bold text-sm active:scale-95 transition-all',
+                  r.value === 'ten_count'
+                    ? 'bg-red-50 border-red-200 text-red-700 hover:border-red-500'
+                    : 'bg-gray-50 border-gray-100 text-navy-950 hover:border-navy-950/30',
+                )}
+              >
+                {r.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setPickingReason(false)}
+              className="mt-1 px-3 py-2 rounded-xl border border-navy-950/10 text-xs font-black uppercase tracking-widest text-navy-950/50 hover:bg-navy-950/5"
+            >
+              キャンセル
+            </button>
+          </div>
         </div>
       )}
     </section>
@@ -281,8 +357,7 @@ function PointButton({ label, sub, disabled, onClick }: { label: string; sub: st
   );
 }
 
-function PenaltyButton({ label, count, status, disabled, onClick }: { label: string; count: number; status: string; disabled: boolean; onClick: () => void }) {
-  const isHansoku = status === 'hansoku';
+function PenaltyButton({ count, isHansoku, disabled, onClick }: { count: number; isHansoku: boolean; disabled: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -296,10 +371,10 @@ function PenaltyButton({ label, count, status, disabled, onClick }: { label: str
     >
       <div className="flex items-center gap-2">
         <AlertTriangle size={14} className={isHansoku ? 'text-white' : 'text-yellow-600'} />
-        <span className="font-black text-xs uppercase tracking-widest">{label}</span>
+        <span className="font-black text-xs uppercase tracking-widest">C 反則</span>
       </div>
       <div className="flex gap-1">
-        {[1,2,3,4].map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className={cn(
             'w-2.5 h-2.5 rounded-full border transition-all',
             count >= i
@@ -312,18 +387,23 @@ function PenaltyButton({ label, count, status, disabled, onClick }: { label: str
   );
 }
 
-function TerminationButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+function SenshuButton({ active, disabled, onClick }: { active: boolean; disabled: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'py-2 rounded-xl font-black border-2 text-[10px] tracking-widest uppercase active:scale-95 transition-all',
-        disabled ? 'bg-gray-50 border-gray-100 text-navy-950/10 cursor-not-allowed'
-                 : 'bg-white border-accent-red text-accent-red hover:bg-accent-red hover:text-white',
+        'flex items-center justify-between p-3 rounded-2xl border-2 active:scale-95 transition-all',
+        active   ? 'bg-green-600 text-white border-green-600' :
+        disabled ? 'bg-gray-50 border-gray-100 cursor-not-allowed opacity-30' :
+                   'bg-white border-navy-950/20 hover:border-green-500',
       )}
     >
-      {label}
+      <div className="flex items-center gap-2">
+        <Trophy size={14} className={active ? 'text-white' : 'text-green-600'} />
+        <span className="font-black text-xs uppercase tracking-widest">先取</span>
+      </div>
+      <span className="text-xs font-black">{active ? 'ON' : 'OFF'}</span>
     </button>
   );
 }
@@ -374,8 +454,9 @@ function OutcomeSummary({ outcome, match }: { outcome: ReturnType<typeof evaluat
     target_score: '目標点到達',
     time_up: '時間切れ',
     hansoku: '反則勝ち',
-    kiken: '棄権',
-    shikkaku: '失格',
+    senshu: '先取',
+    ippon_count: '一本数',
+    wazaari_count: '技あり数',
     hantei: '判定',
   };
   return (

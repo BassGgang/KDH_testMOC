@@ -10,6 +10,7 @@ const validEvent = {
   side: 'AKA' as const,
   kind: 'yuko' as const,
   occurredAtMs: 1000,
+  remainingMs: 179_000,
 };
 
 describe('SyncEventsRequestSchema', () => {
@@ -59,5 +60,19 @@ describe('SyncEventsRequestSchema', () => {
       events: [{ ...validEvent, kind: 'flying_kick' }],
     });
     expect(result.success).toBe(false);
+  });
+
+  it('requires penaltyReason on a c penalty', () => {
+    const missing = SyncEventsRequestSchema.safeParse({
+      matchId: MATCH_ID,
+      events: [{ ...validEvent, kind: 'c' }],
+    });
+    expect(missing.success).toBe(false);
+
+    const present = SyncEventsRequestSchema.safeParse({
+      matchId: MATCH_ID,
+      events: [{ ...validEvent, kind: 'c', penaltyReason: 'jogai' }],
+    });
+    expect(present.success).toBe(true);
   });
 });

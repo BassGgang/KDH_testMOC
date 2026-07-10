@@ -15,20 +15,30 @@ export const ScoringEventKindSchema = z.enum([
   'ippon',
   'waza_ari',
   'yuko',
-  'c1',
-  'c2',
-  'hansoku',
-  'kiken',
-  'shikkaku',
+  'c',
 ]);
+
+export const PenaltyReasonSchema = z.enum([
+  'atesugi',
+  'jogai',
+  'time_wasting',
+  'mubobi',
+  'grabbing',
+  'other',
+  'ten_count',
+]);
+
+export const TargetSchema = z.enum(['jodan', 'chudan']);
+export const TechniqueSchema = z.enum(['tsuki', 'keri']);
 
 export const WinReasonSchema = z.enum([
   'point_gap',
   'target_score',
   'time_up',
   'hansoku',
-  'kiken',
-  'shikkaku',
+  'senshu',
+  'ippon_count',
+  'wazaari_count',
   'hantei',
 ]);
 
@@ -39,14 +49,22 @@ export const MatchSettingsSchema = z.object({
   senshuEnabled: z.boolean(),
 });
 
-export const ScoringEventInputSchema = z.object({
-  id: UuidSchema,
-  matchId: UuidSchema,
-  side: SideSchema,
-  kind: ScoringEventKindSchema,
-  technique: z.string().min(1).max(100).optional(),
-  occurredAtMs: z.number().int().nonnegative(),
-});
+export const ScoringEventInputSchema = z
+  .object({
+    id: UuidSchema,
+    matchId: UuidSchema,
+    side: SideSchema,
+    kind: ScoringEventKindSchema,
+    target: TargetSchema.optional(),
+    technique: TechniqueSchema.optional(),
+    penaltyReason: PenaltyReasonSchema.optional(),
+    occurredAtMs: z.number().int().nonnegative(),
+    remainingMs: z.number().int().nonnegative(),
+  })
+  .refine(
+    (e) => e.kind !== 'c' || e.penaltyReason !== undefined,
+    { message: 'penaltyReason is required for a c penalty', path: ['penaltyReason'] },
+  );
 
 export type ScoringEventInput = z.infer<typeof ScoringEventInputSchema>;
 export type MatchSettingsInput = z.infer<typeof MatchSettingsSchema>;

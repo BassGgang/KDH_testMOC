@@ -53,8 +53,11 @@ export async function POST(req: NextRequest) {
       match_id: e.matchId,
       side: e.side,
       kind: e.kind,
+      target: e.target ?? null,
       technique: e.technique ?? null,
+      penalty_reason: e.penaltyReason ?? null,
       occurred_at_ms: e.occurredAtMs,
+      remaining_ms: e.remainingMs,
     }));
 
     const { error: insertErr } = await supabase.from('scoring_events').insert(rows);

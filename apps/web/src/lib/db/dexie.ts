@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { MatchSettings, Side, ScoringEventKind } from '@karate/domain';
+import type { MatchSettings, PenaltyReason, Side, ScoringEventKind } from '@karate/domain';
 
 export interface LocalMatch {
   id: string;                      // UUID, client-generated
@@ -16,6 +16,7 @@ export interface LocalMatch {
   settings: MatchSettings;
   startedAt: string | null;        // ISO 8601, set when timer first started
   endedAt: string | null;          // ISO 8601, set when match finalized
+  senshuHolder: Side | null;       // Manually assigned senshu (referee toggle)
   createdAt: string;
   matchDraftSent: 0 | 1;           // 1 once the matches row has been upserted on the server
 }
@@ -25,8 +26,11 @@ export interface LocalScoringEvent {
   matchId: string;
   side: Side;
   kind: ScoringEventKind;
-  technique: string | null;
+  target: 'jodan' | 'chudan' | null;
+  technique: 'tsuki' | 'keri' | null;
+  penaltyReason: PenaltyReason | null;   // set when kind === 'c'
   occurredAtMs: number;            // Elapsed ms from match startedAt
+  remainingMs: number;             // Remaining ms at the moment of the event
   createdAt: string;
 }
 
@@ -70,6 +74,30 @@ export class KarateScoringDB extends Dexie {
         // Existing matches predate the matchDraftSent field; default to 0 (not sent).
         await tx.table('matches').toCollection().modify((m: LocalMatch) => {
           if (m.matchDraftSent === undefined) m.matchDraftSent = 0;
+        });
+      });
+
+    // v3: unified `c` penalty model. Events gain target/penaltyReason/remainingMs.
+    this.version(3)
+      .stores({
+        matches: 'id, status, createdAt',
+        events: 'id, matchId, [matchId+occurredAtMs]',
+        outbox: 'id, kind, matchId, nextAttemptAt',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('events').toCollection().modify((e: LocalScoringEvent) => {
+          if (e.target === undefined) e.target = null;
+          if (e.penaltyReason === undefined) e.penaltyReason = null;
+          if (e.remainingMs === undefined) e.remainingMs = 0;
+          // Legacy c1/c2 kinds collapse to the unified `c`.
+          const legacyKind = e.kind as string;
+          if (legacyKind === 'c1' || legacyKind === 'c2') {
+            e.kind = 'c';
+            if (!e.penaltyReason) e.penaltyReason = 'other';
+          }
+        });
+        await tx.table('matches').toCollection().modify((m: LocalMatch) => {
+          if (m.senshuHolder === undefined) m.senshuHolder = null;
         });
       });
   }

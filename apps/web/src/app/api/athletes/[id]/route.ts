@@ -26,8 +26,11 @@ interface EventRow {
   match_id: string;
   side: Side;
   kind: ScoringEventKind;
-  technique: string | null;
+  target: 'jodan' | 'chudan' | null;
+  technique: 'tsuki' | 'keri' | null;
+  penalty_reason: string | null;
   occurred_at_ms: number;
+  remaining_ms: number;
 }
 
 export async function GET(
@@ -67,7 +70,7 @@ export async function GET(
     const [eventsRes, opponentsRes] = await Promise.all([
       supabase
         .from('scoring_events')
-        .select('id, match_id, side, kind, technique, occurred_at_ms')
+        .select('id, match_id, side, kind, target, technique, penalty_reason, occurred_at_ms, remaining_ms')
         .in('match_id', matchIds),
       supabase
         .from('athletes')
@@ -90,8 +93,11 @@ export async function GET(
         matchId: row.match_id,
         side: row.side,
         kind: row.kind,
+        target: row.target ?? undefined,
         technique: row.technique ?? undefined,
+        penaltyReason: (row.penalty_reason ?? undefined) as ScoringEvent['penaltyReason'],
         occurredAtMs: row.occurred_at_ms,
+        remainingMs: row.remaining_ms,
       });
       eventsByMatch.set(row.match_id, list);
     }

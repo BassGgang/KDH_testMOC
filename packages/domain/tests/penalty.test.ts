@@ -1,52 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { evaluatePenalty } from '../src/scoring/penalty';
+import type { ScoreDetail } from '../src/types';
 
-function detail(c1: number, c2: number) {
-  return { ippon: 0, wazaAri: 0, yuko: 0, c1, c2 };
+function detail(c: number): ScoreDetail {
+  return { ippon: 0, wazaAri: 0, yuko: 0, c, total: 0 };
 }
 
-describe('evaluatePenalty', () => {
-  it('returns none for 0 penalties', () => {
-    expect(evaluatePenalty(detail(0, 0))).toEqual({
-      c1Status: 'none',
-      c2Status: 'none',
-      isHansoku: false,
-    });
+describe('evaluatePenalty — unified c track', () => {
+  it('none at 0', () => {
+    expect(evaluatePenalty(detail(0))).toEqual({ status: 'none', count: 0, isHansoku: false });
   });
 
-  it('1st C1 = chukoku', () => {
-    expect(evaluatePenalty(detail(1, 0)).c1Status).toBe('chukoku');
+  it('progresses c1 -> c4 for counts 1..4', () => {
+    expect(evaluatePenalty(detail(1)).status).toBe('c1');
+    expect(evaluatePenalty(detail(2)).status).toBe('c2');
+    expect(evaluatePenalty(detail(3)).status).toBe('c3');
+    expect(evaluatePenalty(detail(4)).status).toBe('c4');
+    expect(evaluatePenalty(detail(4)).isHansoku).toBe(false);
   });
 
-  it('2nd C1 = keikoku', () => {
-    expect(evaluatePenalty(detail(2, 0)).c1Status).toBe('keikoku');
-  });
-
-  it('3rd C1 = hansoku_chui', () => {
-    expect(evaluatePenalty(detail(3, 0)).c1Status).toBe('hansoku_chui');
-  });
-
-  it('4th C1 = hansoku and isHansoku true', () => {
-    const r = evaluatePenalty(detail(4, 0));
-    expect(r.c1Status).toBe('hansoku');
+  it('hansoku at 5 with isHansoku true', () => {
+    const r = evaluatePenalty(detail(5));
+    expect(r.status).toBe('hansoku');
     expect(r.isHansoku).toBe(true);
   });
 
-  it('progression of C2 is independent of C1', () => {
-    expect(evaluatePenalty(detail(0, 1)).c2Status).toBe('chukoku');
-    expect(evaluatePenalty(detail(0, 4)).c2Status).toBe('hansoku');
-    expect(evaluatePenalty(detail(0, 4)).isHansoku).toBe(true);
-  });
-
-  it('C1=3 and C2=3 does not trigger hansoku', () => {
-    const r = evaluatePenalty(detail(3, 3));
-    expect(r.c1Status).toBe('hansoku_chui');
-    expect(r.c2Status).toBe('hansoku_chui');
-    expect(r.isHansoku).toBe(false);
-  });
-
-  it('isHansoku true if any category reaches hansoku', () => {
-    expect(evaluatePenalty(detail(4, 1)).isHansoku).toBe(true);
-    expect(evaluatePenalty(detail(1, 4)).isHansoku).toBe(true);
+  it('caps the dot count at 5 even when c overshoots (e.g. 10-count = 5)', () => {
+    expect(evaluatePenalty(detail(5)).count).toBe(5);
+    expect(evaluatePenalty(detail(7)).count).toBe(5);
+    expect(evaluatePenalty(detail(7)).isHansoku).toBe(true);
   });
 });

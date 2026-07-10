@@ -87,8 +87,11 @@ async function syncEvents(
     matchId: e.matchId,
     side: e.side,
     kind: e.kind,
+    target: e.target ?? undefined,
     technique: e.technique ?? undefined,
+    penaltyReason: e.penaltyReason ?? undefined,
     occurredAtMs: e.occurredAtMs,
+    remainingMs: e.remainingMs,
   }));
 
   if (payloadEvents.length === 0) {
@@ -150,8 +153,11 @@ async function syncFinish(
     matchId: e.matchId,
     side: e.side,
     kind: e.kind,
+    target: e.target ?? undefined,
     technique: e.technique ?? undefined,
+    penaltyReason: e.penaltyReason ?? undefined,
     occurredAtMs: e.occurredAtMs,
+    remainingMs: e.remainingMs,
   }));
 
   const elapsedMs = match.settings.durationSec * 1000;
@@ -159,6 +165,7 @@ async function syncFinish(
     events: domainEvents,
     settings: match.settings,
     elapsedMs,
+    senshuHolder: match.senshuHolder,
   });
 
   const winnerSide = outcome.status === 'decided' ? outcome.winnerId : null;
@@ -188,8 +195,11 @@ async function syncFinish(
       matchId: e.matchId,
       side: e.side,
       kind: e.kind,
+      target: e.target,
       technique: e.technique,
+      penaltyReason: e.penaltyReason,
       occurredAtMs: e.occurredAtMs,
+      remainingMs: e.remainingMs,
     })),
     result: {
       winnerId: winnerAthleteId,
