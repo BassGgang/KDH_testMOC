@@ -3,6 +3,26 @@
 -- Apply manually after migrations to populate a usable demo environment.
 -- =============================================================================
 
+-- -----------------------------------------------------------------------------
+-- Operator bootstrap (SECURITY-CRITICAL).
+-- The handle_new_user trigger provisions EVERY self-service signup as 'athlete'
+-- (least privilege). Operator/coach elevation is a deliberate admin action, done
+-- here — never automatically — so a public signup can't grant itself admin.
+--
+-- Procedure:
+--   1. Sign up the operator account through the app (creates auth.users + an
+--      'athlete' profile).
+--   2. Set OPERATOR_EMAIL below and run this file (or just this statement).
+-- The email is matched against auth.users; no-op until that account exists.
+-- -----------------------------------------------------------------------------
+\set OPERATOR_EMAIL 'operator@example.com'
+
+update public.profiles p
+set role = 'operator'
+from auth.users u
+where u.id = p.id
+  and u.email = :'OPERATOR_EMAIL';
+
 -- Sample athletes (no linked user accounts; created by an operator).
 insert into public.athletes (id, name, rank, affiliation, gender, weight_kg) values
   ('11111111-1111-7111-8111-111111111111', '田中太郎', 'Black',    '横浜空手クラブ', 'male',   72.5),

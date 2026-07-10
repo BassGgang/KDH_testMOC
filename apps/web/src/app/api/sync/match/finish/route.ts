@@ -58,28 +58,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 2. Check for an existing match with this ID (idempotency).
-  const { data: existing, error: selectErr } = await supabase
-    .from('matches')
-    .select('id, winner_id, win_reason')
-    .eq('id', payload.matchId)
-    .maybeSingle();
-  if (selectErr) return serverError('Failed to query match', selectErr.message);
-
-  if (existing) {
-    // Idempotent replay: return the stored result.
-    const response: SyncMatchFinishResponse = {
-      matchId: payload.matchId,
-      status: 'duplicate',
-      serverWinnerId: existing.winner_id,
-      serverReason: existing.win_reason,
-    };
-    return NextResponse.json(response, { status: 200 });
-  }
-
-  // 3. Insert match + events transactionally is hard via supabase-js. Insert
-  //    match first, then events; on event insert failure, we rely on a manual
-  //    cleanup TODO. (A SQL RPC would be cleaner; revisit in Step 7.)
+  // 2. Persist atomically via the finish_match RPC: match + events insert,
+  //    bracket winner advancement, and stats refresh all in one transaction.
   const matchRow = {
     id: payload.matchId,
     tournament_id: payload.tournamentId,
@@ -94,45 +74,42 @@ export async function POST(req: NextRequest) {
     tatami_no: payload.tatamiNo,
     start_time: payload.startedAt,
     end_time: payload.endedAt,
-    status: 'Completed' as const,
     settings: payload.settings,
-    finalized_at: new Date().toISOString(),
   };
+  const eventRows = payload.events.map((e) => ({
+    id: e.id,
+    match_id: e.matchId,
+    side: e.side,
+    kind: e.kind,
+    target: e.target ?? null,
+    technique: e.technique ?? null,
+    penalty_reason: e.penaltyReason ?? null,
+    occurred_at_ms: e.occurredAtMs,
+    remaining_ms: e.remainingMs,
+  }));
 
-  const { error: insertMatchErr } = await supabase.from('matches').insert(matchRow);
-  if (insertMatchErr) {
-    if (insertMatchErr.code === '23505') {
-      return conflict('Match already exists with different content', insertMatchErr.message);
+  const { data, error: rpcErr } = await supabase.rpc('finish_match', {
+    p_match: matchRow,
+    p_events: eventRows,
+  });
+  if (rpcErr) {
+    if (rpcErr.code === '23505') {
+      return conflict('Match already exists with different content', rpcErr.message);
     }
-    return serverError('Failed to insert match', insertMatchErr.message);
+    return serverError('Failed to finish match', rpcErr.message);
   }
 
-  // 4. Insert events, deduped against already-synced events.
-  if (payload.events.length > 0) {
-    const eventRows = payload.events.map((e) => ({
-      id: e.id,
-      match_id: e.matchId,
-      side: e.side,
-      kind: e.kind,
-      target: e.target ?? null,
-      technique: e.technique ?? null,
-      penalty_reason: e.penaltyReason ?? null,
-      occurred_at_ms: e.occurredAtMs,
-      remaining_ms: e.remainingMs,
-    }));
-    const { error: insertEventsErr } = await supabase
-      .from('scoring_events')
-      .upsert(eventRows, { onConflict: 'id', ignoreDuplicates: true });
-    if (insertEventsErr) {
-      return serverError('Failed to insert events', insertEventsErr.message);
-    }
-  }
-
+  const result = data as {
+    matchId: string;
+    status: 'created' | 'duplicate';
+    serverWinnerId: string | null;
+    serverReason: SyncMatchFinishResponse['serverReason'];
+  };
   const response: SyncMatchFinishResponse = {
-    matchId: payload.matchId,
-    status: 'created',
-    serverWinnerId: payload.result.winnerId,
-    serverReason: payload.result.reason,
+    matchId: result.matchId,
+    status: result.status,
+    serverWinnerId: result.serverWinnerId,
+    serverReason: result.serverReason ?? payload.result.reason,
   };
-  return NextResponse.json(response, { status: 201 });
+  return NextResponse.json(response, { status: result.status === 'duplicate' ? 200 : 201 });
 }
