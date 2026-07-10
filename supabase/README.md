@@ -1,7 +1,11 @@
 # Supabase Setup Guide
 
 このディレクトリには、karate-system の DB スキーマと RLS ポリシーが入っています。
-Supabase プロジェクトの作成からマイグレーション適用までを以下の手順で行います。
+
+> **📘 完全なセットアップ手順は [BACKEND_SETUP.md](../BACKEND_SETUP.md) を参照してください。**
+> プロジェクト作成 → キー取得 → 環境変数 → マイグレーション → **email OTP 設定** →
+> **operator 昇格** → 本番デプロイまで、迷わず進める順序でまとめてあります。
+> 以下は DB まわりの参考情報です。
 
 ---
 
@@ -28,13 +32,14 @@ Supabase プロジェクトの作成からマイグレーション適用まで�
 
 ## 3. ローカル環境変数の設定
 
-リポジトリルートで [.env.example](../.env.example) をコピー:
+> ⚠️ `.env.local` の置き場所は **`apps/web/`** です(リポジトリルートに置いても
+> Next.js は読み込みません)。
 
 ```bash
-cp .env.example .env.local
+cp .env.example apps/web/.env.local
 ```
 
-`.env.local` を編集し、上記 3 つを貼り付け:
+`apps/web/.env.local` を編集し、上記 3 つを貼り付け:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
@@ -78,8 +83,8 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-これにより [migrations/20260525120000_init.sql](migrations/20260525120000_init.sql) と
-[migrations/20260525120001_rls.sql](migrations/20260525120001_rls.sql) が順に適用されます。
+これにより migrations/ 配下の **4本**(init → rls → scoring_v2_and_security → rpcs_and_bracket)が
+タイムスタンプ順に適用されます。
 
 ### 代替: SQL Editor で手動実行
 
@@ -140,4 +145,6 @@ import('@karate/db/server').then(async (mod) => {
 |---|---|
 | [migrations/20260525120000_init.sql](migrations/20260525120000_init.sql) | テーブル定義、インデックス、ヘルパー関数 |
 | [migrations/20260525120001_rls.sql](migrations/20260525120001_rls.sql) | Row Level Security ポリシー |
-| [seed.sql](seed.sql) | 開発用シードデータ |
+| [migrations/20260710120000_scoring_v2_and_security.sql](migrations/20260710120000_scoring_v2_and_security.sql) | 統合c採点モデル / pgcrypto / profiles 自動生成トリガ / app_current_role() |
+| [migrations/20260710120001_rpcs_and_bracket.sql](migrations/20260710120001_rpcs_and_bracket.sql) | トランザクション RPC(finish_match / create_tournament)/ ブラケット自動進出 + BYE / stats キャッシュ / RLS 張り替え |
+| [seed.sql](seed.sql) | 開発用シードデータ + operator 昇格(psql 専用の `\set` を含む点に注意) |

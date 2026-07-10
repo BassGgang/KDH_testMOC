@@ -17,7 +17,8 @@ make check        # typecheck + test
 
 全コマンドは `make help` で確認できます。
 
-Supabase のセットアップは [supabase/README.md](supabase/README.md) を参照してください。
+**初回セットアップ**(Supabase プロジェクト作成 → 認証設定 → operator 昇格まで)は
+[BACKEND_SETUP.md](BACKEND_SETUP.md) を上から順に実行してください。DB まわりの参考は [supabase/README.md](supabase/README.md)。
 
 ---
 
