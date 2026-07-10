@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { SwRegister } from '@/components/SwRegister';
+
+// Self-hosted via next/font (no runtime external request; PWA-friendly).
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'Karate Scoring & Analytics',
@@ -32,7 +36,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja">
+    <html lang="ja" className={inter.variable}>
       <body>
         {children}
         <SwRegister />

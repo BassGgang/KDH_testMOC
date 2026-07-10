@@ -191,8 +191,11 @@ export default function MatchScoringPage({ params }: { params: Promise<{ matchId
           penaltyState={akaPenalty}
           hasSenshu={match.senshuHolder === 'AKA'}
           senshuEnabled={match.settings.senshuEnabled}
+          timerActive={isActive}
+          isMatchOver={decided}
           isWinner={outcome?.status === 'decided' && outcome.winnerId === 'AKA'}
-          disabled={decided}
+          isDraw={outcome?.status === 'hantei_required'}
+          decisionReason={reasonLabel(outcome)}
           onPoint={(k) => handleAddPoint('AKA', k)}
           onPenalty={(r) => handleAddPenalty('AKA', r)}
           onToggleSenshu={() => handleToggleSenshu('AKA')}
@@ -204,8 +207,11 @@ export default function MatchScoringPage({ params }: { params: Promise<{ matchId
           penaltyState={aoPenalty}
           hasSenshu={match.senshuHolder === 'AO'}
           senshuEnabled={match.settings.senshuEnabled}
+          timerActive={isActive}
+          isMatchOver={decided}
           isWinner={outcome?.status === 'decided' && outcome.winnerId === 'AO'}
-          disabled={decided}
+          isDraw={outcome?.status === 'hantei_required'}
+          decisionReason={reasonLabel(outcome)}
           onPoint={(k) => handleAddPoint('AO', k)}
           onPenalty={(r) => handleAddPenalty('AO', r)}
           onToggleSenshu={() => handleToggleSenshu('AO')}
@@ -243,7 +249,8 @@ const PENALTY_REASONS: { value: PenaltyReason; label: string }[] = [
 
 function ScoringPanel({
   side, athleteName, score, penaltyState, hasSenshu, senshuEnabled,
-  isWinner, disabled, onPoint, onPenalty, onToggleSenshu,
+  timerActive, isMatchOver, isWinner, isDraw, decisionReason,
+  onPoint, onPenalty, onToggleSenshu,
 }: {
   side: Side;
   athleteName: string;
@@ -251,8 +258,11 @@ function ScoringPanel({
   penaltyState: { count: number; isHansoku: boolean };
   hasSenshu: boolean;
   senshuEnabled: boolean;
+  timerActive: boolean;
+  isMatchOver: boolean;
   isWinner: boolean;
-  disabled: boolean;
+  isDraw: boolean;
+  decisionReason: string;
   onPoint: (kind: 'ippon' | 'waza_ari' | 'yuko') => void;
   onPenalty: (reason: PenaltyReason) => void;
   onToggleSenshu: () => void;
@@ -260,6 +270,8 @@ function ScoringPanel({
   const [pickingReason, setPickingReason] = useState(false);
   const sideColor = side === 'AKA' ? 'bg-red-600' : 'bg-blue-600';
   const sideText = side === 'AKA' ? '赤' : '青';
+  // Mock rule: scoring is locked while the clock is running; edit only when stopped.
+  const disabled = timerActive || isMatchOver;
 
   return (
     <section className={cn(
@@ -270,14 +282,20 @@ function ScoringPanel({
         {sideText} / {side} — {athleteName}
       </div>
 
-      <div className="py-6 flex items-center justify-center gap-4">
-        {hasSenshu && (
-          <span className="flex flex-col items-center gap-1 text-green-600">
-            <span className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]" />
-            <span className="text-[9px] font-black tracking-widest uppercase">先取</span>
+      {/* Score + penalty dots + senshu indicator */}
+      <div className="py-6 px-4 flex items-center justify-center gap-4">
+        <PenaltyDots count={penaltyState.count} isHansoku={penaltyState.isHansoku} />
+        <div className="text-[120px] font-mono font-black leading-none tabular-nums">{score}</div>
+        <div className="flex flex-col items-center gap-1 w-12">
+          <span className="text-[9px] font-black tracking-widest uppercase text-green-600">先取</span>
+          <span className={cn(
+            'w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-black transition-all',
+            hasSenshu ? 'bg-green-500 text-white shadow-[0_0_12px_rgba(34,197,94,0.7)] scale-110'
+                      : 'bg-navy-950/5 text-navy-950/20 border-2 border-navy-950/10',
+          )}>
+            SEN
           </span>
-        )}
-        <div className="text-[120px] font-mono font-black leading-none">{score}</div>
+        </div>
       </div>
 
       {/* Point buttons */}
@@ -302,10 +320,33 @@ function ScoringPanel({
         />
       </div>
 
-      {isWinner && (
-        <div className="absolute top-2 right-2 bg-yellow-400 text-navy-950 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5 shadow-lg">
-          <Trophy size={12} fill="currentColor" />
-          Winner
+      {/* Timer-active lock: input is blocked while the clock runs. */}
+      {timerActive && !isMatchOver && (
+        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-3 text-center p-6 animate-in fade-in duration-200">
+          <span className="w-4 h-4 bg-red-600 rounded-full shadow-[0_0_12px_#dc2626] animate-pulse" />
+          <span className="text-white font-black text-lg tracking-tighter uppercase italic">Match In Progress</span>
+          <span className="text-[10px] font-black tracking-[0.2em] uppercase text-white/50">Scoring is locked while the fight is active</span>
+        </div>
+      )}
+
+      {/* Match-over overlay: winner / hantei / plain end. */}
+      {isMatchOver && (
+        <div className="absolute inset-0 bg-navy-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3 text-center p-6 animate-in zoom-in duration-300">
+          {isWinner ? (
+            <>
+              <Trophy size={44} className="text-yellow-400" />
+              <p className="text-yellow-400 font-black text-2xl tracking-tighter uppercase italic">Winner / 勝者</p>
+              <p className="text-white/60 font-black text-[10px] uppercase tracking-[0.2em]">{decisionReason}</p>
+            </>
+          ) : isDraw ? (
+            <>
+              <AlertTriangle size={44} className="text-yellow-500" />
+              <p className="text-yellow-500 font-black text-lg tracking-tighter uppercase italic">判定必要 / Hantei</p>
+              <p className="text-white/60 font-black text-[10px] uppercase tracking-[0.2em]">審判5人の投票による同点判定へ</p>
+            </>
+          ) : (
+            <p className="text-white/40 font-black text-lg tracking-tighter uppercase italic">Match Over / 試合終了</p>
+          )}
         </div>
       )}
 
@@ -337,6 +378,27 @@ function ScoringPanel({
         </div>
       )}
     </section>
+  );
+}
+
+// Vertical 5-dot penalty column beside the score, with the mock's amber glow.
+function PenaltyDots({ count, isHansoku }: { count: number; isHansoku: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <span className="text-[9px] font-black tracking-wider text-yellow-600">C</span>
+      <div className="flex flex-col gap-1.5 p-1.5 bg-navy-950/5 rounded-xl">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className={cn(
+            'w-3 h-3 rounded-full border-2 transition-all',
+            count >= i
+              ? isHansoku
+                ? 'bg-yellow-400 border-yellow-300 shadow-[0_0_12px_rgba(234,179,8,0.9)] scale-110 animate-pulse'
+                : 'bg-yellow-400 border-yellow-300 shadow-[0_0_8px_rgba(234,179,8,0.7)]'
+              : 'bg-white border-navy-950/10',
+          )} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -449,22 +511,28 @@ function OutcomeSummary({ outcome, match }: { outcome: ReturnType<typeof evaluat
     return <p className="text-[10px] font-black uppercase tracking-widest text-yellow-700">Hantei (判定) Required — 主審判定を待つ</p>;
   }
   const winnerName = outcome.winnerId === 'AKA' ? match.akaName : outcome.winnerId === 'AO' ? match.aoName : 'Draw';
-  const reasonMap: Record<string, string> = {
-    point_gap: 'ポイント差',
-    target_score: '目標点到達',
-    time_up: '時間切れ',
-    hansoku: '反則勝ち',
-    senshu: '先取',
-    ippon_count: '一本数',
-    wazaari_count: '技あり数',
-    hantei: '判定',
-  };
   return (
     <div>
       <p className="text-[10px] font-black uppercase tracking-widest text-navy-950/40">Result</p>
-      <p className="font-black text-base tracking-tight">{winnerName} <span className="text-navy-950/40 text-xs ml-2">({reasonMap[outcome.reason] ?? outcome.reason})</span></p>
+      <p className="font-black text-base tracking-tight">{winnerName} <span className="text-navy-950/40 text-xs ml-2">({reasonLabel(outcome)})</span></p>
     </div>
   );
+}
+
+const REASON_LABELS: Record<string, string> = {
+  point_gap: 'ポイント差',
+  target_score: '目標点到達',
+  time_up: '時間切れ',
+  hansoku: '反則勝ち',
+  senshu: '先取',
+  ippon_count: '一本数',
+  wazaari_count: '技あり数',
+  hantei: '判定',
+};
+
+function reasonLabel(outcome: ReturnType<typeof evaluateMatch> | null): string {
+  if (!outcome || outcome.status !== 'decided') return '判定 / HANTEI';
+  return REASON_LABELS[outcome.reason] ?? outcome.reason;
 }
 
 function CenteredText({ children }: { children: React.ReactNode }) {
