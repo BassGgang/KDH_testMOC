@@ -1,28 +1,27 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { generateSingleElimBracket } from '@karate/domain';
 import { CreateTournamentRequestSchema } from '@karate/schemas';
-import { getServerSupabase } from '@karate/db/server';
+import { withAuth } from '@/lib/auth';
 import { fromZodError, serverError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
-  const supabase = getServerSupabase();
+// Any authenticated user may browse the tournament list.
+export const GET = withAuth([], async ({ supabase }) => {
   const { data, error } = await supabase
     .from('tournaments')
     .select('id, name, date, status, created_at')
     .order('date', { ascending: false });
   if (error) return serverError('Failed to list tournaments', error.message);
   return NextResponse.json({ tournaments: data ?? [] });
-}
+});
 
-export async function POST(req: NextRequest) {
+// Only operators may create tournaments.
+export const POST = withAuth(['operator'], async ({ supabase }, req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const parsed = CreateTournamentRequestSchema.safeParse(body);
   if (!parsed.success) return fromZodError(parsed.error);
   const { name, date, ageDivision, gender, weightClass, athleteIds } = parsed.data;
-
-  const supabase = getServerSupabase();
 
   // Build the bracket in the domain layer, then persist the whole tournament
   // (tournament + category + bracket + slots + BYE advancement) atomically via
@@ -48,4 +47,4 @@ export async function POST(req: NextRequest) {
 
   const result = data as { id: string };
   return NextResponse.json({ id: result.id }, { status: 201 });
-}
+});

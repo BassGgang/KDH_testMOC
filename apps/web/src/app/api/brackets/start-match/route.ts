@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { StartBracketMatchRequestSchema } from '@karate/schemas';
 import { getServerSupabase } from '@karate/db/server';
+import { withAuth } from '@/lib/auth';
 import { badRequest, fromZodError, serverError, unprocessable } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
@@ -23,7 +24,9 @@ const DEFAULT_SETTINGS = {
  * Response:
  *   { matchId, akaAthleteId, aoAthleteId, tournamentId, categoryId }
  */
-export async function POST(req: NextRequest) {
+// Only operators may start bracket matches. Direct table writes use
+// service_role because matches/bracket_slots have no INSERT/UPDATE RLS policy.
+export const POST = withAuth(['operator'], async (_ctx, req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const parsed = StartBracketMatchRequestSchema.safeParse(body);
   if (!parsed.success) return fromZodError(parsed.error);
@@ -103,4 +106,4 @@ export async function POST(req: NextRequest) {
     categoryId,
     reused: false,
   }, { status: 201 });
-}
+});

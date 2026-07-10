@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SyncEventsRequestSchema, type SyncEventsResponse } from '@karate/schemas';
 import { getServerSupabase } from '@karate/db/server';
+import { withAuth } from '@/lib/auth';
 import { fromZodError, serverError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest) {
+// Scoring sync is an operator (referee console) action. Authorize the operator
+// at the app layer; the actual writes use service_role because scoring_events /
+// matches have no INSERT RLS policy by design (writes flow only through here).
+export const POST = withAuth(['operator'], async (_ctx, req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const parsed = SyncEventsRequestSchema.safeParse(body);
   if (!parsed.success) return fromZodError(parsed.error);
@@ -70,4 +74,4 @@ export async function POST(req: NextRequest) {
     duplicateEventIds: [...existingIds],
   };
   return NextResponse.json(response, { status: newEvents.length > 0 ? 201 : 200 });
-}
+});

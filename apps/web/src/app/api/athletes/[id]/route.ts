@@ -4,7 +4,7 @@ import {
   type MatchSummary, type ScoringEvent, type ScoringEventKind, type Side,
 } from '@karate/domain';
 import { UuidSchema } from '@karate/schemas';
-import { getServerSupabase } from '@karate/db/server';
+import { withAuth } from '@/lib/auth';
 import { badRequest, notFound, serverError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
@@ -33,15 +33,14 @@ interface EventRow {
   remaining_ms: number;
 }
 
-export async function GET(
+export const GET = withAuth([], async (
+  { supabase },
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
-) {
+) => {
   const { id } = await params;
   const check = UuidSchema.safeParse(id);
   if (!check.success) return badRequest('id is not a valid UUID');
-
-  const supabase = getServerSupabase();
 
   const { data: athlete, error: athleteErr } = await supabase
     .from('athletes')
@@ -152,4 +151,4 @@ export async function GET(
     stats,
     history,
   });
-}
+});

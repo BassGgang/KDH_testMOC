@@ -233,6 +233,15 @@ declare
   v_eff_ao  uuid;
   v_saved  public.matches%rowtype;
 begin
+  -- Defense in depth: this SECURITY DEFINER function bypasses RLS, so guard it
+  -- against a direct anon/authenticated RPC call from a non-operator.
+  -- IS DISTINCT FROM so a NULL role (no/invalid JWT) is also rejected —
+  -- `null <> 'operator'` is NULL (not TRUE) and would slip past a plain `<>`.
+  if public.app_current_role() is distinct from 'operator' then
+    raise exception 'finish_match requires the operator role'
+      using errcode = 'insufficient_privilege';
+  end if;
+
   select * into v_existing from public.matches where id = v_match_id;
 
   -- Already finalized: idempotent replay, return the stored result.
@@ -347,6 +356,14 @@ declare
   v_round      int;
   v_max_round  int;
 begin
+  -- Defense in depth: RLS is bypassed inside SECURITY DEFINER, so gate here too.
+  -- IS DISTINCT FROM also rejects a NULL role (no/invalid JWT); a plain `<>`
+  -- would let it through since `null <> 'operator'` is NULL, not TRUE.
+  if public.app_current_role() is distinct from 'operator' then
+    raise exception 'create_tournament requires the operator role'
+      using errcode = 'insufficient_privilege';
+  end if;
+
   insert into public.tournaments (name, date, status)
   values (p_name, p_date, 'Ongoing')
   returning id into v_tournament;

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getServerSupabase } from '@karate/db/server';
+import { withAuth } from '@/lib/auth';
 import { serverError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
-  const supabase = getServerSupabase();
+// Reads through the RLS-scoped client: operators see all, coaches see their
+// athletes, athletes see themselves (enforced by policy, not the app layer).
+export const GET = withAuth([], async ({ supabase }) => {
   const { data, error } = await supabase
     .from('athletes')
     .select('id, name, rank, affiliation, gender, weight_kg, created_at')
@@ -23,4 +24,4 @@ export async function GET() {
       weightKg: a.weight_kg,
     })),
   });
-}
+});

@@ -26,6 +26,12 @@ importers:
       '@karate/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@supabase/ssr':
+        specifier: ^0.5.2
+        version: 0.5.2(@supabase/supabase-js@2.106.1)
+      '@supabase/supabase-js':
+        specifier: ^2.45.0
+        version: 2.106.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -35,6 +41,9 @@ importers:
       dexie-react-hooks:
         specifier: ^1.1.7
         version: 1.1.7(@types/react@19.2.15)(dexie@4.4.2)(react@19.2.6)
+      input-otp:
+        specifier: ^1.4.2
+        version: 1.4.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       lucide-react:
         specifier: ^0.546.0
         version: 0.546.0(react@19.2.6)
@@ -78,9 +87,15 @@ importers:
 
   packages/db:
     dependencies:
+      '@supabase/ssr':
+        specifier: ^0.5.2
+        version: 0.5.2(@supabase/supabase-js@2.106.1)
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.106.1
+      next:
+        specifier: '>=15'
+        version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
     devDependencies:
       '@types/node':
         specifier: ^22.14.0
@@ -632,6 +647,11 @@ packages:
     resolution: {integrity: sha512-eQCYri5E8KsjpDgC7g28cOOS2britjUWdNSJluFMainqrMRepzjOnaxqXc3RoAz7H0dxmBrfLUNF6NGP8C+YaA==}
     engines: {node: '>=20.0.0'}
 
+  '@supabase/ssr@0.5.2':
+    resolution: {integrity: sha512-n3plRhr2Bs8Xun1o4S3k1CDv17iH5QY9YcoEvXX3bxV1/5XSasA0mNXYycFmADIdtdE6BG9MRjP5CGIs8qxC8A==}
+    peerDependencies:
+      '@supabase/supabase-js': ^2.43.4
+
   '@supabase/storage-js@2.106.1':
     resolution: {integrity: sha512-HWcLIhqinhWKpOQ3WzglR2unjW0eh9J7yOu3IZrZNIEkraK4La/HDvTqndljGsNw0itPtyHhuKBxRoPG1VUARw==}
     engines: {node: '>=20.0.0'}
@@ -730,6 +750,9 @@ packages:
 
   '@tailwindcss/postcss@4.3.0':
     resolution: {integrity: sha512-Jm05Tjx+9yCLGv5qw1c+84Psds8MnyrEQYCB+FFk2lgGiUjlRqdxke4mVTuYrj2xnVZqKim2Apr5ySuQRYAw/w==}
+
+  '@types/cookie@0.6.0':
+    resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
 
   '@types/d3-array@3.2.2':
     resolution: {integrity: sha512-hOLWVbm7uRza0BYXpIIW5pxfrKe0W+D5lrFiAEYR+pb6w3N2SwSMaJbXdUfSEv+dT4MfHBLtn5js0LAWaO6otw==}
@@ -832,6 +855,10 @@ packages:
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
+
+  cookie@0.7.2:
+    resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
+    engines: {node: '>= 0.6'}
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
@@ -952,6 +979,12 @@ packages:
 
   immer@11.1.8:
     resolution: {integrity: sha512-/tbkHMW7y10Lx6i1crLjD4/OhNkRG+Fo7byZHtah0547nIeXYcpIXaUh0IAQY6gO5459qpGGYapcEOHtFXkIuA==}
+
+  input-otp@1.4.2:
+    resolution: {integrity: sha512-l3jWwYNvrEa6NTCt7BECfCm48GvwuZzkoeG3gBL2w4CHeOXW3eKFmf9UNYkNfYc3mxMrthMnxjIE07MT0zLBQA==}
+    peerDependencies:
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
 
   internmap@2.0.3:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
@@ -1624,6 +1657,12 @@ snapshots:
       '@supabase/phoenix': 0.4.2
       tslib: 2.8.1
 
+  '@supabase/ssr@0.5.2(@supabase/supabase-js@2.106.1)':
+    dependencies:
+      '@supabase/supabase-js': 2.106.1
+      '@types/cookie': 0.6.0
+      cookie: 0.7.2
+
   '@supabase/storage-js@2.106.1':
     dependencies:
       iceberg-js: 0.8.1
@@ -1709,6 +1748,8 @@ snapshots:
       '@tailwindcss/oxide': 4.3.0
       postcss: 8.5.15
       tailwindcss: 4.3.0
+
+  '@types/cookie@0.6.0': {}
 
   '@types/d3-array@3.2.2': {}
 
@@ -1811,6 +1852,8 @@ snapshots:
   client-only@0.0.1: {}
 
   clsx@2.1.1: {}
+
+  cookie@0.7.2: {}
 
   csstype@3.2.3: {}
 
@@ -1923,6 +1966,11 @@ snapshots:
   immer@10.2.0: {}
 
   immer@11.1.8: {}
+
+  input-otp@1.4.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+    dependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   internmap@2.0.3: {}
 

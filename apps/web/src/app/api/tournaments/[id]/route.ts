@@ -1,19 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { UuidSchema } from '@karate/schemas';
-import { getServerSupabase } from '@karate/db/server';
+import { withAuth } from '@/lib/auth';
 import { badRequest, notFound, serverError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
 
-export async function GET(
+export const GET = withAuth([], async (
+  { supabase },
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
-) {
+) => {
   const { id } = await params;
   const check = UuidSchema.safeParse(id);
   if (!check.success) return badRequest('id is not a valid UUID');
-
-  const supabase = getServerSupabase();
 
   const { data: tournament, error: tErr } = await supabase
     .from('tournaments')
@@ -86,4 +85,4 @@ export async function GET(
     athletes,
     matches,
   });
-}
+});

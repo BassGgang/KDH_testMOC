@@ -4,18 +4,21 @@ import {
   type SyncMatchFinishResponse,
 } from '@karate/schemas';
 import { evaluateMatch, type ScoringEvent } from '@karate/domain';
-import { getServerSupabase } from '@karate/db/server';
+import { withAuth } from '@/lib/auth';
 import { conflict, fromZodError, serverError, unprocessable } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest) {
+// Finalizing a match is an operator (referee console) action. The finish_match
+// RPC is SECURITY DEFINER (bypasses RLS internally) but guards on the operator
+// role, so it must be called with the request-scoped client (user JWT), not
+// service_role — under service_role app_current_role() would be null.
+export const POST = withAuth(['operator'], async ({ supabase }, req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const parsed = SyncMatchFinishRequestSchema.safeParse(body);
   if (!parsed.success) return fromZodError(parsed.error);
 
   const payload = parsed.data;
-  const supabase = getServerSupabase();
 
   // 1. Re-run the domain rules with the submitted events to verify the client's
   //    claimed result. The match has by definition reached an end-state, so we
@@ -112,4 +115,4 @@ export async function POST(req: NextRequest) {
     serverReason: result.serverReason ?? payload.result.reason,
   };
   return NextResponse.json(response, { status: result.status === 'duplicate' ? 200 : 201 });
-}
+});
