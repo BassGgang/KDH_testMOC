@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 // Scoring sync is an operator (referee console) action. Authorize the operator
 // at the app layer; the actual writes use service_role because scoring_events /
 // matches have no INSERT RLS policy by design (writes flow only through here).
-export const POST = withAuth(['operator'], async (_ctx, req: NextRequest) => {
+export const POST = withAuth(['operator'], async ({ user }, req: NextRequest) => {
   const body = await req.json().catch(() => null);
   const parsed = SyncEventsRequestSchema.safeParse(body);
   if (!parsed.success) return fromZodError(parsed.error);
@@ -32,6 +32,7 @@ export const POST = withAuth(['operator'], async (_ctx, req: NextRequest) => {
       settings: match.settings,
       start_time: match.startedAt,
       status: 'Live' as const,
+      referee_id: user.id,
     };
     const { error: upsertErr } = await supabase
       .from('matches')
@@ -62,6 +63,7 @@ export const POST = withAuth(['operator'], async (_ctx, req: NextRequest) => {
       penalty_reason: e.penaltyReason ?? null,
       occurred_at_ms: e.occurredAtMs,
       remaining_ms: e.remainingMs,
+      created_by: user.id,
     }));
 
     const { error: insertErr } = await supabase.from('scoring_events').insert(rows);

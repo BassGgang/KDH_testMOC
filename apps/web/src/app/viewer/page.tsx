@@ -10,8 +10,6 @@ interface Athlete {
   name: string;
   rank: string;
   affiliation: string | null;
-  gender: 'male' | 'female' | null;
-  weightKg: number | null;
 }
 
 export default function ViewerPage() {
@@ -79,7 +77,6 @@ export default function ViewerPage() {
                     <p className="font-black text-base tracking-tight truncate">{a.name}</p>
                     <p className="text-[10px] font-mono text-navy-950/40 truncate">
                       {a.rank}
-                      {a.weightKg != null && ` / ${a.weightKg}kg`}
                       {a.affiliation && ` / ${a.affiliation}`}
                     </p>
                   </div>

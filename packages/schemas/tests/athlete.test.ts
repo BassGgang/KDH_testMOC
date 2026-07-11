@@ -41,6 +41,11 @@ describe('AthleteResponseSchema', () => {
       },
     });
     expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data).not.toHaveProperty('birthDate');
+      expect(r.data).not.toHaveProperty('gender');
+      expect(r.data).not.toHaveProperty('weightKg');
+    }
   });
 
   it('accepts an athlete with no stats yet', () => {

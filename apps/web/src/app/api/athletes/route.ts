@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export const GET = withAuth([], async ({ supabase }) => {
   const { data, error } = await supabase
     .from('athletes')
-    .select('id, name, rank, affiliation, gender, weight_kg, created_at')
+    .select('id, name, rank, affiliation')
     .order('name', { ascending: true });
 
   if (error) return serverError('Failed to list athletes', error.message);
@@ -20,8 +20,6 @@ export const GET = withAuth([], async ({ supabase }) => {
       name: a.name,
       rank: a.rank,
       affiliation: a.affiliation,
-      gender: a.gender,
-      weightKg: a.weight_kg,
     })),
   });
 });

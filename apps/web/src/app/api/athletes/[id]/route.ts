@@ -44,7 +44,7 @@ export const GET = withAuth([], async (
 
   const { data: athlete, error: athleteErr } = await supabase
     .from('athletes')
-    .select('id, name, rank, affiliation, gender, weight_kg, birth_date')
+    .select('id, name, rank, affiliation')
     .eq('id', id)
     .maybeSingle();
 
@@ -145,9 +145,6 @@ export const GET = withAuth([], async (
     name: athlete.name,
     rank: athlete.rank,
     affiliation: athlete.affiliation,
-    gender: athlete.gender,
-    weightKg: athlete.weight_kg,
-    birthDate: athlete.birth_date,
     stats,
     history,
   });

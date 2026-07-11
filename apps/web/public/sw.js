@@ -1,7 +1,7 @@
 // Service Worker for Karate Scoring & Analytics
 // Strategy:
-//   - Navigation requests: network-first with cache fallback (so users see fresh UI
-//     when online but the app still launches when offline).
+//   - Navigation requests: network-only. Authenticated HTML must not survive
+//     sign-out in a shared cache.
 //   - Static assets (/_next/, /icon*): cache-first.
 //   - API requests: network-only (data must never be served stale by SW —
 //     IndexedDB + outbox handles offline state authoritatively).
@@ -10,13 +10,7 @@
 
 const CACHE_VERSION = 'v1';
 const STATIC_CACHE = `karate-static-${CACHE_VERSION}`;
-const PAGES_CACHE  = `karate-pages-${CACHE_VERSION}`;
-
 const PRECACHE_URLS = [
-  '/',
-  '/scoring',
-  '/scoring/new',
-  '/viewer',
   '/manifest.webmanifest',
   '/icon.svg',
   '/icon-maskable.svg',
@@ -24,7 +18,7 @@ const PRECACHE_URLS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(PAGES_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)),
+    caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)),
   );
   self.skipWaiting();
 });
@@ -34,7 +28,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((k) => k !== STATIC_CACHE && k !== PAGES_CACHE)
+          .filter((k) => k !== STATIC_CACHE)
           .map((k) => caches.delete(k)),
       ),
     ),
@@ -59,9 +53,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation / pages: network-first.
+  // Never cache authenticated HTML. IndexedDB remains authoritative for an
+  // already-open offline scoring screen.
   if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
-    event.respondWith(networkFirst(req, PAGES_CACHE));
     return;
   }
 });
@@ -76,21 +70,5 @@ async function cacheFirst(req, cacheName) {
     return res;
   } catch (err) {
     return cached ?? Response.error();
-  }
-}
-
-async function networkFirst(req, cacheName) {
-  const cache = await caches.open(cacheName);
-  try {
-    const res = await fetch(req);
-    if (res.ok) cache.put(req, res.clone());
-    return res;
-  } catch (err) {
-    const cached = await cache.match(req);
-    if (cached) return cached;
-    // Last-resort fallback: serve the cached scoring page so the app still launches.
-    const fallback = await cache.match('/scoring');
-    if (fallback) return fallback;
-    return Response.error();
   }
 }

@@ -4,6 +4,7 @@
 オフラインファースト PWA + Next.js + Supabase で構成。
 
 設計の詳細は [ARCHITECTURE.md](ARCHITECTURE.md) を参照。
+実在する選手情報を扱う前に [SECURITY_PRIVACY.md](SECURITY_PRIVACY.md) の本番投入ゲートを満たしてください。
 
 ---
 

@@ -25,9 +25,6 @@ interface AthleteResponse {
   name: string;
   rank: string;
   affiliation: string | null;
-  gender: 'male' | 'female' | null;
-  weightKg: number | null;
-  birthDate: string | null;
   stats: {
     attack: number;
     defense: number;
@@ -83,7 +80,6 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
           <h1 className="text-5xl font-black tracking-tighter uppercase italic">{data.name}</h1>
           <p className="text-navy-950/60 font-bold uppercase tracking-widest text-sm mt-2">
             {data.rank}
-            {data.weightKg != null && ` / ${data.weightKg}kg`}
             {data.affiliation && ` / ${data.affiliation}`}
             {' / '} {data.stats.matchCount} MATCHES · {data.stats.winRate}% WIN RATE
           </p>

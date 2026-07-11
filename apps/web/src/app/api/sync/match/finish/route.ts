@@ -59,6 +59,14 @@ export const POST = withAuth(['operator'], async ({ supabase }, req: NextRequest
         reason: outcome.reason,
       });
     }
+    if (outcome.reason !== payload.result.reason) {
+      return unprocessable('Submitted win reason disagrees with re-computed result', {
+        expected: outcome.reason,
+        submitted: payload.result.reason,
+      });
+    }
+  } else if (outcome.status === 'hantei_required' && payload.result.reason !== 'hantei') {
+    return unprocessable('A judges decision must use the hantei reason');
   }
 
   // 2. Persist atomically via the finish_match RPC: match + events insert,

@@ -111,3 +111,12 @@ export function getDB(): KarateScoringDB {
   if (!cached) cached = new KarateScoringDB();
   return cached;
 }
+
+/** Delete athlete names, match history and pending sync data from this device. */
+export async function clearSensitiveLocalData(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDB();
+  await db.transaction('rw', db.matches, db.events, db.outbox, async () => {
+    await Promise.all([db.matches.clear(), db.events.clear(), db.outbox.clear()]);
+  });
+}

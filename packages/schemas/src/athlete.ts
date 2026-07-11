@@ -17,9 +17,6 @@ export const AthleteResponseSchema = z.object({
   name: z.string().min(1).max(100),
   rank: z.string().min(1).max(50),
   affiliation: z.string().max(100).nullable(),
-  birthDate: z.string().date().nullable(),
-  gender: z.enum(['male', 'female']).nullable(),
-  weightKg: z.number().positive().nullable(),
   stats: AthleteStatsSchema.nullable(),
 });
 

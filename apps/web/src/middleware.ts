@@ -31,6 +31,20 @@ export async function middleware(req: NextRequest) {
   const isAuthRoute = pathname === '/login' || pathname.startsWith('/auth');
   const isApi = pathname.startsWith('/api');
 
+  // Reject cross-site state changes even if a browser were to attach cookies.
+  // SameSite cookies remain the first line of defense; this is defense in depth.
+  const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+  if (isApi && unsafeMethod) {
+    const fetchSite = req.headers.get('sec-fetch-site');
+    const origin = req.headers.get('origin');
+    if (fetchSite === 'cross-site' || (origin && origin !== req.nextUrl.origin)) {
+      return NextResponse.json(
+        { error: 'forbidden', message: 'Cross-site request rejected' },
+        { status: 403 },
+      );
+    }
+  }
+
   if (!user && !isAuthRoute) {
     if (isApi) {
       return NextResponse.json(
@@ -52,6 +66,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(home);
   }
 
+  // Authenticated HTML/API responses can contain personal information and must
+  // not be stored by browsers, shared proxies or a service worker.
+  res.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
   return res;
 }
 

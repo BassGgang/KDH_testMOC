@@ -33,7 +33,8 @@ function LoginInner() {
     setBusy(true);
     const { error } = await getBrowserSupabase().auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      // Production is invite-only. Accounts must be provisioned by an admin.
+      options: { shouldCreateUser: process.env.NODE_ENV !== 'production' },
     });
     setBusy(false);
     if (error) {

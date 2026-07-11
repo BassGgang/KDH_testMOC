@@ -124,7 +124,7 @@ supabase link --project-ref <YOUR_PROJECT_REF>  # DB パスワードを聞かれ
 make db-push        # = supabase db push
 ```
 
-以下の **4本** が順に適用されます:
+以下の **5本** が順に適用されます:
 
 | # | ファイル | 内容 |
 |---|---|---|
@@ -132,6 +132,7 @@ make db-push        # = supabase db push
 | 2 | `20260525120001_rls.sql` | RLS ポリシー |
 | 3 | `20260710120000_scoring_v2_and_security.sql` | 統合c採点モデル / pgcrypto / **profiles自動生成トリガ** / `app_current_role()` |
 | 4 | `20260710120001_rpcs_and_bracket.sql` | **トランザクションRPC**(finish_match / create_tournament)/ ブラケット自動進出+BYE / stats キャッシュ |
+| 5 | `20260711150000_privacy_hardening.sql` | 個人情報列の遮断 / 監査ログ / 内部RPC封鎖 / 試合開始の原子化 |
 
 適用状態の確認:
 
@@ -187,14 +188,14 @@ make db-status      # = supabase migration list — Local と Remote が4本揃�
 
 ### 5-4. サインアップポリシー(任意・要検討)
 
-現状の実装は「**未登録メールでも OTP を送り、その場でアカウント作成**」します
-(`shouldCreateUser: true`)。作成されたユーザーは DB トリガにより **必ず最小権限の
-`athlete`** ロールになるため権限昇格の危険はありませんが、
-「関係者以外はアカウント自体を作らせたくない」場合は:
+本番ビルドは `shouldCreateUser: false` 相当の**招待制**です。事前に管理者が作成した
+ユーザーだけがOTPでログインできます。加えてSupabase側でも:
 
 - **Authentication** → **Sign In / Providers** → **Allow new users to sign up** を **OFF**
 
-にすると、既存ユーザーのみログイン可能になります(未登録メールへの OTP は拒否されます)。
+にして、既存ユーザーのみログイン可能にしてください(未登録メールへのOTPは拒否されます)。
+開発ビルドだけはローカル検証のため新規ユーザー作成を許可します。本番設定を開発用へ
+戻さないでください。
 
 ---
 
@@ -292,6 +293,10 @@ insert into public.athletes (id, name, rank, affiliation, gender, weight_kg) val
 - [ ] **Authentication → Rate Limits** で OTP 送信上限を運用規模に合わせて調整
 - [ ] サインアップポリシーを決定(5-4 参照)
 - [ ] operator 昇格済みアカウントでログインできることを確認
+- [ ] **Allow new users to sign up = OFF** を確認(本番は招待制)
+- [ ] 管理者アカウントとSupabase/Vercel管理者にMFAを設定
+- [ ] 個人情報の保存期間・削除・事故対応手順を組織内で承認
+- [ ] サインアウト時に未同期データ警告と端末データ消去が動作することを共用端末で確認
 - [ ] (推奨)Legacy API Keys(anon / service_role)を使っている場合は
       新キー(`sb_publishable_` / `sb_secret_`)へ移行 — **旧キーは2026年末に廃止予定**
 

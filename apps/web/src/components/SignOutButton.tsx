@@ -3,16 +3,32 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
+import { clearSensitiveLocalData, getDB } from '@/lib/db/dexie';
 
 export function SignOutButton() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function signOut() {
+    const pending = await getDB().outbox.count();
+    if (pending > 0 && !window.confirm(
+      `未同期のデータが ${pending} 件あります。サインアウトすると端末から完全に削除され、復元できません。続行しますか？`,
+    )) return;
+
     setBusy(true);
-    await fetch('/auth/signout', { method: 'POST' });
-    router.replace('/login');
-    router.refresh();
+    try {
+      const response = await fetch('/auth/signout', { method: 'POST' });
+      if (!response.ok) throw new Error('Sign-out failed');
+      await clearSensitiveLocalData();
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((key) => key.startsWith('karate-')).map((key) => caches.delete(key)));
+      }
+      router.replace('/login');
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
