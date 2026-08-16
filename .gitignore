@@ -28,6 +28,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Supabase CLI local state (link info, version cache)
+supabase/.temp/
+
 # Test coverage
 coverage/
 
