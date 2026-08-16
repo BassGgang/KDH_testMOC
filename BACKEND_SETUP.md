@@ -1,5 +1,5 @@
 # バックエンド セットアップ手順書
-> **最終更新: 2026-07-10**(Supabase の新APIキー体系・メールレート制限を反映)
+> **最終更新: 2026-08-16**(組織メンバーとして参加する場合の手順を追加)
 
 ---
 
@@ -17,6 +17,41 @@
 8. (任意) シードデータ投入
 9. (本番運用時) デプロイと本番設定
 ```
+
+---
+
+## 既に招待された方へ(組織メンバーとして参加する場合)
+
+Supabase の組織に招待された方は、**Step 1(プロジェクト作成)を飛ばして** Step 0 → 2 → 3 → …
+と進んでください。以下の点だけ、新規作成の場合と異なります。
+
+**招待の承認** — 招待リンクの**有効期限は 24 時間**です。切れた場合は管理者に再送を依頼してください。
+承認後、https://supabase.com/dashboard に既存プロジェクトが表示されます。
+
+**Step 2(キー取得)の注意** — Secret key は**新規作成せず、既存のものを Reveal してコピー**してください。
+メンバーが各自「Create new secret key」で発行すると、キーが人数分増えて失効・棚卸しが困難になります。
+(新規発行が必要なのは、キーを漏洩などでローテートするときだけです。)
+
+**Step 4(CLI リンク)** — `supabase/.temp/` は gitignore されているため、**リンクは各自で実行が必要**です。
+`supabase link` で DB パスワードを聞かれた場合は管理者に確認してください。
+
+**Step 7(operator 昇格)** — 自分では実行できません(SQL Editor へのアクセスが必要)。
+**管理者に依頼してください。** 昇格前は閲覧のみ可能で、書き込みは 403 になります。
+
+### キーの取り扱い
+
+> ⚠️ **`.env.local` やキーを他のメンバーに直接渡さないでください。**
+> `sb_secret_...`(旧 service_role)は **RLS を完全にバイパス**し、全テーブルの読み書き・削除が可能です。
+> 渡すことは実質 DB の管理者権限を渡すことと同じで、取り消すにはキーのローテーションが必要になります。
+
+メンバーを増やすときは、キーを共有するのではなく **Supabase の組織に招待**してください
+(ダッシュボード → Organization → **Team** → Invite)。**Free プランでもメンバー数は無制限**です。
+これならアクセス権を個別に剥奪でき、各自がダッシュボードから自分でキーを取得できます。
+
+> Free / Pro プランのロールは**組織スコープ**のため、メンバーは組織内の全プロジェクトにアクセスできます。
+> プロジェクト単位で権限を分けるには Team プラン以上が必要です。
+> なお Free の「アクティブプロジェクト 2 つまで」の枠は、**Owner / Administrator として所属する
+> 全組織で合算**されます(Developer ロールなら影響しません)。
 
 ---
 
@@ -103,6 +138,16 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
 - `NEXT_PUBLIC_` が付く2つ → ブラウザに埋め込まれます。**publishable キーのみ**を入れること
 - 付かない2つ → サーバ(API Route / RPC)専用。**secret キー**を入れること
 - `.env.local` は `.gitignore` 済みでコミットされません
+
+> **別案**: リポジトリルートに `.env.local` を置いて `apps/web/` からリンクする方法もあります。
+> ルートの env を参照するツール(CLI / スクリプト)と実体を1つで共有したい場合に便利です。
+>
+> ```bash
+> cp .env.example .env.local          # ルートに実体を作成して編集
+> ln -s ../../.env.local apps/web/.env.local
+> ```
+>
+> どちらの方式でも動作します。**両方に実体を置くと片方だけ古くなる**ので、必ずどちらか一方にしてください。
 
 ---
 
@@ -315,7 +360,9 @@ insert into public.athletes (id, name, rank, affiliation, gender, weight_kg) val
 | `function gen_random_uuid() does not exist` | `create extension pgcrypto` が未適用。0003 に含まれるため `make db-push` を再実行 |
 | `supabase link` で **DB パスワード**を聞かれた | Step 1 で保管したパスワードを入力。紛失時は Project Settings → Database → Reset database password |
 | SQL Editor で seed.sql が **`\set` でエラー** | `\set` は psql 専用。**Step 7 方法A** の UPDATE 文を使う |
-| dev で `SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set` | `.env.local` の置き場所が違う。**ルートではなく `apps/web/.env.local`** に置く |
+| dev で `SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set` | `.env.local` の置き場所が違う。**ルートではなく `apps/web/.env.local`** に置く(または Step 3 の別案でリンクを張る) |
+| `EADDRINUSE: address already in use :::3000` | 既に dev サーバが起動中。既存のものを使うか、そのプロセスを停止してから再実行 |
+| 組織の**招待リンクが切れた** | 有効期限は 24 時間。管理者に再送を依頼 |
 
 ---
 
