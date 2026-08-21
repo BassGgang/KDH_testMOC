@@ -4,10 +4,14 @@ const nextConfig = {
   async headers() {
     const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
     const connectSrc = ["'self'", supabaseOrigin].filter(Boolean).join(' ');
+    // `next dev` wraps every module in eval() (eval-source-map); production builds never use eval.
+    const scriptSrc = process.env.NODE_ENV === 'development'
+      ? "'self' 'unsafe-inline' 'unsafe-eval'"
+      : "'self' 'unsafe-inline'";
     return [{
       source: '/(.*)',
       headers: [
-        { key: 'Content-Security-Policy', value: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src ${connectSrc}; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests` },
+        { key: 'Content-Security-Policy', value: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src ${connectSrc}; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests` },
         { key: 'Referrer-Policy', value: 'no-referrer' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'X-Frame-Options', value: 'DENY' },
