@@ -2,12 +2,12 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { OTPInput, type SlotProps } from 'input-otp';
-import { Lock, ShieldCheck, Mail, ArrowLeft } from 'lucide-react';
+import { Lock, ShieldCheck, Mail, KeyRound } from 'lucide-react';
 import { getBrowserSupabase } from '@karate/db/client';
-import { cn } from '@/lib/utils';
 
-type Stage = 'email' | 'code';
+// Sign-up from this form is a development convenience only. Production is
+// invite-only: accounts must be provisioned by an admin (see BACKEND_SETUP.md).
+const allowSignUp = process.env.NODE_ENV !== 'production';
 
 function LoginInner() {
   const router = useRouter();
@@ -17,46 +17,51 @@ function LoginInner() {
   const rawNext = params.get('next') ?? '';
   const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
 
-  const [stage, setStage] = useState<Stage>('email');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function sendCode(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       setError('メールアドレスの形式が正しくありません。例: name@example.com');
       return;
     }
-    setBusy(true);
-    const { error } = await getBrowserSupabase().auth.signInWithOtp({
-      email,
-      // Production is invite-only. Accounts must be provisioned by an admin.
-      options: { shouldCreateUser: process.env.NODE_ENV !== 'production' },
-    });
-    setBusy(false);
-    if (error) {
-      setError(`コードを送信できませんでした。${error.message}`);
+    if (password.length < 8) {
+      setError('パスワードは8文字以上で入力してください。');
       return;
     }
-    setStage('code');
-  }
-
-  async function verify(value: string) {
-    setError(null);
     setBusy(true);
-    const { error } = await getBrowserSupabase().auth.verifyOtp({
-      email,
-      token: value,
-      type: 'email',
-    });
-    setBusy(false);
-    if (error) {
-      setError('認証コードが正しくありません。メールに届いた6桁を再確認してください。');
-      setCode('');
-      return;
+    const supabase = getBrowserSupabase();
+    if (mode === 'signup') {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      setBusy(false);
+      if (error) {
+        setError(`アカウントを作成できませんでした。${error.message}`);
+        return;
+      }
+      // With "Confirm email" enabled in Supabase, signUp succeeds but returns no
+      // session — redirecting would just bounce back here. Surface it instead.
+      if (!data.session) {
+        setError(
+          'アカウントは作成されましたが、メール確認が必要な設定になっています。届いた確認メールを承認するか、管理者に Supabase の Authentication → Sign In / Providers → Email → 「Confirm email」を OFF にするよう依頼してください。',
+        );
+        return;
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setBusy(false);
+      if (error) {
+        setError(
+          error.message === 'Invalid login credentials'
+            ? 'メールアドレスまたはパスワードが正しくありません。'
+            : `サインインできませんでした。${error.message}`,
+        );
+        return;
+      }
     }
     router.replace(next);
     router.refresh();
@@ -75,88 +80,68 @@ function LoginInner() {
           </div>
         </div>
 
-        {stage === 'email' ? (
-          <form onSubmit={sendCode} className="flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-navy-950/40">メールアドレス / Email</span>
-              <div className="flex items-center gap-2 border-2 border-navy-950/15 rounded-xl px-3 focus-within:border-navy-950 transition-colors">
-                <Mail size={16} className="text-navy-950/40" />
-                <input
-                  type="email"
-                  autoFocus
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); if (error) setError(null); }}
-                  placeholder="name@example.com"
-                  className="flex-1 py-3 bg-transparent outline-none font-semibold"
-                  aria-invalid={error != null}
-                />
-              </div>
-            </label>
-            {error && <p className="text-xs font-bold text-red-600">{error}</p>}
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full py-3.5 bg-navy-950 text-white rounded-xl font-black tracking-[0.2em] uppercase text-sm hover:bg-navy-900 active:scale-95 transition-all disabled:opacity-40"
-            >
-              {busy ? '送信中…' : 'コードを送信 / Send Code'}
-            </button>
-            <div className="flex items-start gap-2 text-[11px] text-navy-950/50 font-semibold bg-navy-950/5 rounded-xl p-3">
-              <ShieldCheck size={16} className="shrink-0 mt-0.5 text-navy-950/40" />
-              <span>登録済みのメールアドレスに6桁の認証コードを送ります。パスワードは不要です。</span>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-navy-950/40">メールアドレス / Email</span>
+            <div className="flex items-center gap-2 border-2 border-navy-950/15 rounded-xl px-3 focus-within:border-navy-950 transition-colors">
+              <Mail size={16} className="text-navy-950/40" />
+              <input
+                type="email"
+                autoFocus
+                autoComplete="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); if (error) setError(null); }}
+                placeholder="name@example.com"
+                className="flex-1 py-3 bg-transparent outline-none font-semibold"
+                aria-invalid={error != null}
+              />
             </div>
-          </form>
-        ) : (
-          <div className="flex flex-col gap-4">
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-navy-950/40">パスワード / Password</span>
+            <div className="flex items-center gap-2 border-2 border-navy-950/15 rounded-xl px-3 focus-within:border-navy-950 transition-colors">
+              <KeyRound size={16} className="text-navy-950/40" />
+              <input
+                type="password"
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); if (error) setError(null); }}
+                placeholder="8文字以上"
+                className="flex-1 py-3 bg-transparent outline-none font-semibold"
+                aria-invalid={error != null}
+              />
+            </div>
+          </label>
+          {error && <p className="text-xs font-bold text-red-600">{error}</p>}
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full py-3.5 bg-navy-950 text-white rounded-xl font-black tracking-[0.2em] uppercase text-sm hover:bg-navy-900 active:scale-95 transition-all disabled:opacity-40"
+          >
+            {busy
+              ? (mode === 'signup' ? '作成中…' : '認証中…')
+              : (mode === 'signup' ? 'アカウント作成 / Sign Up' : 'サインイン / Sign In')}
+          </button>
+          {allowSignUp && (
             <button
-              onClick={() => { setStage('email'); setCode(''); setError(null); }}
-              className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-navy-950/40 hover:text-navy-950 transition-colors self-start"
+              type="button"
+              onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }}
+              className="text-[10px] font-black uppercase tracking-widest text-navy-950/40 hover:text-navy-950 transition-colors self-center"
             >
-              <ArrowLeft size={12} /> メールを変更
+              {mode === 'signin' ? '初めての方はこちら（開発用） / Create Account' : 'サインインに戻る / Back to Sign In'}
             </button>
-            <p className="text-xs font-semibold text-navy-950/60">
-              <span className="font-black text-navy-950">{email}</span> に送られた6桁を入力してください。
-            </p>
-            <OTPInput
-              maxLength={6}
-              value={code}
-              onChange={setCode}
-              onComplete={verify}
-              containerClassName="flex items-center justify-center gap-2"
-              render={({ slots }) => (
-                <>
-                  {slots.map((slot, i) => <OtpSlot key={i} {...slot} />)}
-                </>
-              )}
-            />
-            {error && <p className="text-xs font-bold text-red-600 text-center">{error}</p>}
-            <button
-              onClick={() => verify(code)}
-              disabled={busy || code.length < 6}
-              className="w-full py-3.5 bg-navy-950 text-white rounded-xl font-black tracking-[0.2em] uppercase text-sm hover:bg-navy-900 active:scale-95 transition-all disabled:opacity-40"
-            >
-              {busy ? '認証中…' : 'サインイン / Sign In'}
-            </button>
+          )}
+          <div className="flex items-start gap-2 text-[11px] text-navy-950/50 font-semibold bg-navy-950/5 rounded-xl p-3">
+            <ShieldCheck size={16} className="shrink-0 mt-0.5 text-navy-950/40" />
+            <span>登録済みのメールアドレスとパスワードでサインインしてください。</span>
           </div>
-        )}
+        </form>
 
         <p className="text-center text-[9px] font-black uppercase tracking-[0.2em] text-navy-950/30">
           NexTep Karate DX · Internal Operations
         </p>
       </div>
     </main>
-  );
-}
-
-function OtpSlot(props: SlotProps) {
-  return (
-    <div
-      className={cn(
-        'w-11 h-14 flex items-center justify-center text-2xl font-black font-mono border-b-2 transition-all rounded-t-md',
-        props.isActive ? 'border-navy-950 bg-navy-950/5 scale-105' : 'border-navy-950/20',
-      )}
-    >
-      {props.char ?? (props.hasFakeCaret && <span className="w-0.5 h-7 bg-navy-950 animate-caret-blink" />)}
-    </div>
   );
 }
 
